@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>LAN Drop</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  body { margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1216; color: #e6e8eb; display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 24px; box-sizing: border-box; }
+  @media (prefers-color-scheme: light) { body { background: #f6f7f9; color: #1a1d21; } }
+  h1 { font-size: 18px; margin: 0 0 8px; } p { color: #9aa3ad; margin: 0 0 16px; }
+  button { font: inherit; padding: 8px 16px; border-radius: 8px; border: 1px solid #3b82f6; background: #3b82f6; color: #fff; cursor: pointer; }
+  code { font-size: 13px; }
+</style></head>
+<body><div>
+  <h1>Can't reach the drop</h1>
+  <p id="msg">The host may be asleep, offline, or on a different network.</p>
+  <button onclick="location.href = new URLSearchParams(location.search).get('url') || '/'">Try again</button>
+  <script>
+    const q = new URLSearchParams(location.search);
+    if (q.get('url')) document.getElementById('msg').innerHTML = 'Could not connect to <code></code>. The host may be asleep, offline, or on a different network.';
+    if (q.get('url')) document.querySelector('code').textContent = q.get('url');
+    setTimeout(() => { location.href = q.get('url') || '/'; }, 15000);
+  </script>
+</div></body></html>

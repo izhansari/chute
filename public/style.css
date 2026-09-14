@@ -55,7 +55,11 @@ header.top {
 .brand { display: flex; align-items: center; gap: 12px; }
 .logo { font-size: 28px; }
 .sub { margin: 0; color: var(--muted); font-size: 13px; }
+.top-right { display: flex; align-items: center; gap: 8px; }
 .top-actions { display: flex; align-items: center; gap: 8px; }
+#settingsBtn { font-size: 16px; line-height: 1; padding: 4px 8px; }
+html.desktop .dropzone { padding: 20px 16px; }
+html.desktop footer { display: none; }
 .pill {
   font-size: 12px; padding: 3px 10px; border-radius: 999px;
   background: var(--dz); color: var(--accent); border: 1px solid var(--border);
@@ -145,7 +149,7 @@ footer { max-width: 760px; margin: 0 auto; padding: 12px 20px 24px; text-align: 
 
 @media (max-width: 560px) {
   header.top { flex-wrap: wrap; }
-  .top-actions { width: 100%; justify-content: flex-end; }
+  .top-right { width: 100%; justify-content: flex-end; }
   .sub { display: none; }
   .dropzone { padding: 20px 12px; }
   .item-row { flex-wrap: wrap; }

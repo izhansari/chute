@@ -11,13 +11,16 @@
     dropzone: $('#dropzone'), chooseBtn: $('#chooseBtn'), fileInput: $('#fileInput'),
     textForm: $('#textForm'), textInput: $('#textInput'), uploads: $('#uploads'),
     items: $('#items'), empty: $('#empty'), listInfo: $('#listInfo'), subline: $('#subline'),
+    settingsBtn: $('#settingsBtn'),
   };
 
   const state = {
     token: null, key: null, server: null,
     items: [], metaCache: new Map(), expanded: new Set(), imageUrls: new Map(),
     pollTimer: null,
+    seen: null, own: new Set(), // for desktop notifications: ids already seen / uploaded from here
   };
+  const desktop = window.lanDrop || null; // present when running inside the desktop app
 
   // ---------- crypto ----------
   const hexToBytes = (h) => Uint8Array.from(h.match(/../g), (x) => parseInt(x, 16));
@@ -123,7 +126,7 @@
 
   function showApp() {
     el.gate.hidden = true; el.app.hidden = false; el.topActions.hidden = false;
-    el.statusPill.textContent = 'unlocked · ' + location.host;
+    el.statusPill.textContent = desktop ? 'unlocked' : 'unlocked · ' + location.host;
     el.subline.textContent = `End-to-end encrypted. Items disappear after ${state.server.ttlHours}h. Max ${state.server.maxMB} MB per item.`;
   }
 
@@ -164,7 +167,24 @@
         state.metaCache.set(it.id, { kind: 'file', name: '(undecryptable item)', type: '', broken: true });
       }
     }));
+    announceNew();
     render();
+  }
+
+  // Desktop notifications for items that arrived from other devices.
+  function announceNew() {
+    if (!desktop) return;
+    if (!state.seen) { state.seen = new Set(state.items.map((i) => i.id)); return; } // first load: nothing is "new"
+    const fresh = state.items.filter((i) => !state.seen.has(i.id) && !state.own.has(i.id));
+    for (const i of state.items) state.seen.add(i.id);
+    if (!fresh.length) return;
+    if (fresh.length === 1) {
+      const m = state.metaCache.get(fresh[0].id) || {};
+      const body = m.kind === 'text' ? (m.preview || '').replace(/\s+/g, ' ').slice(0, 120) : `${m.name || 'file'} · ${fmtSize(fresh[0].size)}`;
+      desktop.notify({ title: m.kind === 'text' ? 'New text in the drop' : 'New file in the drop', body });
+    } else {
+      desktop.notify({ title: `${fresh.length} new items in the drop`, body: fresh.map((f) => { const m = state.metaCache.get(f.id) || {}; return m.kind === 'text' ? 'text' : m.name; }).join(', ').slice(0, 120) });
+    }
   }
 
   function fmtSize(n) {
@@ -338,6 +358,7 @@
       const body = await encrypt(bytes);
       const item = await uploadXHR(body, metaB64, row.progress);
       state.metaCache.set(item.id, meta);
+      state.own.add(item.id);
       row.done();
       await refresh();
     } catch (e) { row.error(e.message); }
@@ -366,6 +387,18 @@
 
   el.gateForm.addEventListener('submit', (e) => { e.preventDefault(); unlock(el.pass.value, el.remember.checked); });
   el.lockBtn.addEventListener('click', () => lock());
+
+  if (desktop) {
+    document.documentElement.classList.add('desktop');
+    el.settingsBtn.hidden = false;
+    el.settingsBtn.addEventListener('click', () => desktop.openSettings());
+    el.remember.checked = true; // a desktop app should not ask every launch
+    desktop.onDropFiles((files) => {
+      if (!state.token) return;
+      sendFiles(files.map((f) => new File([f.bytes], f.name, { type: f.type || '' })));
+    });
+    desktop.onDropText((text) => { if (state.token) sendText(text); });
+  }
 
   el.chooseBtn.addEventListener('click', (e) => { e.stopPropagation(); el.fileInput.click(); });
   el.dropzone.addEventListener('click', () => el.fileInput.click());

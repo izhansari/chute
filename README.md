@@ -12,9 +12,59 @@ something in on one machine, grab it on another. Everything expires on its own.
   immediately with the ✕ button.
 - **Locked down.** HTTPS, LAN-only address filtering, a 10-minute lockout after 10
   bad passphrase attempts, size limits, and a strict Content-Security-Policy.
-- **Zero dependencies.** Plain Node.js. No npm install needed.
+- **Zero dependencies** for the server. Plain Node.js; `npm install` is only needed to
+  build the desktop app.
 
-## Setup (once, on the machine that will host the drop)
+## Two ways to run it
+
+1. **Desktop app** (recommended): a menu bar / system tray app for Mac and Windows. One
+   person picks "Host", everyone else picks their computer from a list. Native
+   notifications, drop files on the tray icon, send the clipboard from the tray menu,
+   launch at login. No certificate warnings.
+2. **Plain server + browser**: run `npm start` on one machine, everyone else opens a URL.
+   Zero dependencies, works from any device with a browser, including phones.
+
+Both use the same web UI and the same encryption; you can mix them freely.
+
+## Desktop app
+
+Build installers (needs Node 18+; produces a `.dmg` on Mac and an installer `.exe` on
+Windows, in `dist/`):
+
+```bash
+npm install
+npm run dist
+```
+
+Or run it straight from source while developing:
+
+```bash
+npm run desktop
+```
+
+First launch opens Settings:
+
+- **Host the drop on this computer**: choose the shared passphrase. The drop runs in the
+  background whenever this computer is on and announces itself on the network.
+- **Connect to a teammate's drop**: hosts on the network appear in a list; click **Use**.
+  You can also type an address such as `https://their-mac.local:8443`.
+
+Then click the tray icon to open the drop. Everything else is the same web UI described
+below, plus:
+
+- **Notifications** when someone else adds something (click to open the drop).
+- **Drop files onto the menu bar icon** (Mac) to send them without opening the window.
+- **Send clipboard to the drop** from the tray menu: text or a screenshot you just copied.
+- **Downloads** land in your Downloads folder with a notification; click it to reveal.
+- **Launch at login** from the tray menu, so it is always there.
+- The host's self-signed certificate is remembered on first connection (trust on first
+  use). If it ever changes, you are asked before continuing.
+
+The installers are unsigned. On first open, macOS will say the app is from an
+unidentified developer: right-click the app and choose **Open**. Windows SmartScreen
+shows "More info → Run anyway".
+
+## Plain server: setup (once, on the machine that will host the drop)
 
 Requirements: Node.js 18+ and OpenSSL (already on macOS and Linux; on Windows
 `winget install ShiningLight.OpenSSL`).
@@ -30,7 +80,7 @@ kept. Setup also generates a self-signed TLS certificate.
 Optional flags: `--ttl 12` (hours to keep items), `--max 2048` (max MB per item),
 `--port 8443`. You can also pass `--pass "..."` for a non-interactive setup.
 
-## Run
+## Plain server: run
 
 ```bash
 npm start
@@ -78,6 +128,14 @@ data directory, and someone on the network who doesn't know the passphrase.
 What it does not protect against: anyone who *has* the passphrase and network access, or
 a compromised host machine (it serves the page, so it could serve malicious JavaScript).
 That is the normal limit of any web-based end-to-end encryption.
+
+## Project layout
+
+- `lib/server.js`: the server as a module (used by both the CLI and the desktop app)
+- `lib/setup.js`: key derivation, certificate generation, config writing
+- `server.js`, `setup.js`: command-line entry points
+- `public/`: the web UI, served by the host and loaded by the desktop app
+- `desktop/`: Electron shell (tray, notifications, settings, discovery, cert pinning)
 
 ## Notes
 
