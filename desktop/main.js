@@ -311,6 +311,41 @@ function applyLoginItem() {
   } catch (e) { console.log('[login item]', e.message); }
 }
 
+// ---------- thumbnails + Quick Look ----------
+const TMP_DIR = path.join(app.getPath('temp'), 'chute');
+const PREVIEW_DIR = path.join(USER_DATA, 'preview');
+function safeName(name) { return String(name || 'file').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 120) || 'file'; }
+function cleanDir(dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ } }
+
+// Renders a small JPEG data URL for a file using the OS thumbnailer (Quick Look on macOS, Shell on Windows).
+async function thumbnailFor(name, bytes) {
+  if (!bytes || bytes.length > 64 * 1024 * 1024) return null;
+  fs.mkdirSync(TMP_DIR, { recursive: true });
+  const tmp = path.join(TMP_DIR, require('crypto').randomBytes(6).toString('hex') + '-' + safeName(name));
+  try {
+    fs.writeFileSync(tmp, Buffer.from(bytes));
+    const img = await nativeImage.createThumbnailFromPath(tmp, { width: 256, height: 256 });
+    if (!img || img.isEmpty()) return null;
+    const { width, height } = img.getSize();
+    const scale = 144 / Math.max(width, height);
+    const small = scale < 1 ? img.resize({ width: Math.round(width * scale), height: Math.round(height * scale), quality: 'good' }) : img;
+    const data = 'data:image/jpeg;base64,' + small.toJPEG(74).toString('base64');
+    return data.length <= 48 * 1024 ? data : null;
+  } catch { return null; }
+  finally { try { fs.unlinkSync(tmp); } catch { /* ignore */ } }
+}
+
+// Writes the decrypted file to a private folder and opens it in Quick Look (macOS) or the default app.
+async function quickLook(name, bytes) {
+  if (!bytes || bytes.length > 512 * 1024 * 1024) return false;
+  fs.mkdirSync(PREVIEW_DIR, { recursive: true, mode: 0o700 });
+  const file = path.join(PREVIEW_DIR, safeName(name));
+  fs.writeFileSync(file, Buffer.from(bytes), { mode: 0o600 });
+  if (IS_MAC && win) { nativeDialogOpen = true; win.previewFile(file, name); setTimeout(() => { nativeDialogOpen = false; }, 1500); return true; }
+  const err = await shell.openPath(file);
+  return !err;
+}
+
 // ---------- IPC (page bridge) ----------
 ipcMain.on('notify', (e, payload) => {
   if (!payload || typeof payload !== 'object') return;
@@ -323,6 +358,8 @@ ipcMain.on('open-settings', () => openSettings());
 ipcMain.on('hide', () => { if (win && !settings.pinned) win.hide(); });
 ipcMain.on('choose-files', () => chooseFilesDialog());
 ipcMain.handle('toggle-pinned', () => { settings.pinned = !settings.pinned; saveSettings(); return settings.pinned; });
+ipcMain.handle('thumbnail', (e, f) => thumbnailFor(f && f.name, f && f.bytes));
+ipcMain.handle('quick-look', (e, f) => quickLook(f && f.name, f && f.bytes));
 ipcMain.handle('app-info', () => ({ platform: process.platform, version: app.getVersion(), mode: settings.mode, pinned: settings.pinned }));
 
 // ---------- IPC (settings window) ----------
@@ -397,6 +434,7 @@ app.on('second-instance', () => showMain());
 
 app.whenReady().then(async () => {
   if (IS_MAC && !SELF_TEST) app.dock.hide();
+  cleanDir(PREVIEW_DIR); cleanDir(TMP_DIR);
   app.setAppUserModelId('app.chute.desktop');
   wireDownloads();
   refreshTray = createTray();
@@ -413,7 +451,7 @@ app.whenReady().then(async () => {
   else ensureLoaded(); // load in the background so notifications work
 });
 app.on('window-all-closed', () => { /* stay in the tray */ });
-app.on('before-quit', () => { quitting = true; stopHost(); if (bonjour) { try { bonjour.destroy(); } catch { /* ignore */ } } });
+app.on('before-quit', () => { quitting = true; cleanDir(PREVIEW_DIR); stopHost(); if (bonjour) { try { bonjour.destroy(); } catch { /* ignore */ } } });
 app.on('activate', () => showMain());
 
 // ---------- self test (development): host mode, screenshots, native drops, quits ----------
@@ -446,8 +484,10 @@ async function runSelfTest() {
     results.bridge = await win.webContents.executeJavaScript('typeof window.chute === "object" && typeof window.chute.notify === "function"');
     await win.webContents.executeJavaScript(`(async () => { document.getElementById('passInput').value = 'test-passphrase-123'; document.getElementById('gateForm').requestSubmit(); await new Promise(r => setTimeout(r, 3500)); return document.getElementById('gate').hidden; })()`);
     win.webContents.send('drop-text', 'Standup moved to 3pm, room B.\nBring the USB-C adapter.');
-    win.webContents.send('drop-files', [{ name: 'app-icon.png', type: 'image/png', bytes: fs.readFileSync(path.join(ICONS, 'icon-256.png')) }, { name: 'design-assets.zip', type: 'application/zip', bytes: Buffer.alloc(2 * 1024 * 1024) }]);
-    await wait(3000);
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 400]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 120>>stream\nBT /F1 28 Tf 30 340 Td (Q3 Roadmap) Tj ET\n0.2 0.47 0.96 rg 30 60 240 240 re f\n1 g BT /F1 16 Tf 60 170 Td (Chute) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>');
+    win.webContents.send('drop-files', [{ name: 'app-icon.png', type: 'image/png', bytes: fs.readFileSync(path.join(ICONS, 'icon-256.png')) }, { name: 'design-assets.zip', type: 'application/zip', bytes: Buffer.alloc(2 * 1024 * 1024) }, { name: 'Q3 roadmap.pdf', type: 'application/pdf', bytes: pdf }]);
+    await wait(4500);
+    results.thumbs = await win.webContents.executeJavaScript('[...document.querySelectorAll(".item")].map(li => li.querySelector(".item-name > span").textContent + ":" + (li.querySelector("img.thumb") ? "thumb" : "tile"))');
     results.items = await win.webContents.executeJavaScript('[...document.querySelectorAll(".item-name > span:first-child")].map(e => e.textContent)');
     results.tiles = await win.webContents.executeJavaScript('[...document.querySelectorAll(".tile")].map(e => e.className)');
     fs.writeFileSync(path.join(out, 'main-unlocked.png'), (await win.webContents.capturePage()).toPNG());

@@ -161,6 +161,10 @@ body.dragging .dropzone { border-color: var(--accent); background: var(--accent-
 .tile .ico { width: 20px; height: 20px; }
 .tile.image { background: var(--tile-image); } .tile.text { background: var(--tile-text); } .tile.archive { background: var(--tile-archive); }
 .tile.file { background: var(--tile-file); } .tile.media { background: var(--tile-media); }
+.thumb-btn { padding: 0; border: 0; background: none; cursor: pointer; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; flex: 0 0 auto; box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgba(0,0,0,.12); background: var(--surface-2); transition: transform .12s; }
+.thumb-btn:hover { transform: scale(1.06); }
+.thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+html.desktop .thumb-btn { width: 40px; height: 40px; }
 .item-main { min-width: 0; }
 .item-name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
 .item-name .new { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 999px; }

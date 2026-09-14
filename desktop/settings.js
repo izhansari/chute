@@ -88,7 +88,13 @@
     const s = await api.get();
     setMode(s.mode || (s.hostConfigured ? 'host' : 'connect'));
     $('#serverUrl').value = s.serverUrl || ''; selectedUrl = s.serverUrl || '';
-    $('#ttl').value = s.host.ttlHours; $('#max').value = s.host.maxMB; $('#port').value = s.host.port;
+    const pick = (sel, value, label) => {
+      if (![...sel.options].some((o) => Number(o.value) === Number(value))) sel.add(new Option(label, String(value)));
+      sel.value = String(value);
+    };
+    pick($('#ttl'), s.host.ttlHours, `${s.host.ttlHours} hours`);
+    pick($('#max'), s.host.maxMB, `${s.host.maxMB} MB`);
+    $('#port').value = s.host.port;
     $('#notifications').checked = !!s.notifications;
     $('#launchAtLogin').checked = !!s.launchAtLogin;
     if (!s.canLoginItem) { $('#launchAtLogin').disabled = true; $('#loginHint').hidden = false; }

@@ -28,8 +28,8 @@ Both use the same web UI and the same encryption; you can mix them freely.
 
 ## Desktop app
 
-Build installers (needs Node 18+; produces a `.dmg` on Mac and an installer `.exe` on
-Windows, in `dist/`):
+Build installers (needs Node 18+; produces one universal `.dmg` for Intel and Apple
+Silicon Macs and an installer `.exe` for Windows, in `dist/`):
 
 ```bash
 npm install
@@ -55,6 +55,12 @@ things in from Finder or Explorer. Everything else is the same web UI described 
 
 - **Notifications** when someone else adds something, and an unread count next to the
   menu bar icon (a red dot on Windows) until you open the chute. New items are marked.
+- **Real previews as icons.** Images, PDFs and most documents show a thumbnail of the
+  actual file instead of a generic icon. The sender makes the thumbnail (with the OS
+  thumbnailer in the desktop app) and it travels encrypted with the item, so receivers
+  can tell what a file is without downloading it.
+- **Quick Look** (Mac): the eye button or the thumbnail opens the decrypted file in Quick
+  Look. On Windows it opens in the default app.
 - **Drop files onto the menu bar icon** (Mac) to send them without opening the window.
 - **Send clipboard** from the tray menu: text or a screenshot you just copied.
 - **Downloads** land in your Downloads folder with a notification; click it to reveal.

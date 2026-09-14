@@ -288,12 +288,13 @@
       const fresh = state.fresh.has(it.id);
       const hasMore = isText && (meta.length || 0) > (meta.preview || '').length;
 
+      const canPeek = !isText && (canQuickLook || kind === 'image' || (meta.type || '') === 'application/pdf');
       const actions = h('div', { class: 'item-actions' });
       if (isText) {
         actions.append(iconBtn('copy', 'Copy text', (e) => copyText(it, e.currentTarget)));
         if (hasMore || expanded) actions.append(iconBtn(expanded ? 'collapse' : 'expand', expanded ? 'Show less' : 'Show all', () => toggleExpand(it.id)));
       } else {
-        if (kind === 'image') actions.append(iconBtn(state.imageUrls.has(it.id) ? 'eyeOff' : 'eye', state.imageUrls.has(it.id) ? 'Hide preview' : 'Preview', () => toggleImage(it.id)));
+        if (canPeek) actions.append(iconBtn(state.imageUrls.has(it.id) ? 'eyeOff' : 'eye', state.imageUrls.has(it.id) ? 'Hide preview' : (canQuickLook ? 'Quick Look' : 'Preview'), () => peek(it, meta)));
         actions.append(iconBtn('download', desktop ? 'Save to Downloads' : 'Download', () => download(it, meta)));
       }
       actions.append(iconBtn('trash', 'Delete now', () => remove(it.id), 'danger'));
@@ -306,8 +307,11 @@
 
       const enter = !state.animated.has(it.id);
       state.animated.add(it.id);
+      const icon = meta.thumb
+        ? h('button', { class: 'thumb-btn', type: 'button', title: canPeek ? 'Preview' : meta.name, onclick: () => { if (canPeek) peek(it, meta); } }, h('img', { class: 'thumb', src: meta.thumb, alt: '' }))
+        : h('div', { class: 'tile ' + kind }, svg(kind));
       const li = h('li', { class: 'item' + (fresh ? ' fresh' : '') + (enter ? ' enter' : ''), 'data-id': it.id, onanimationend: (e) => e.currentTarget.classList.remove('enter') },
-        h('div', { class: 'tile ' + kind }, svg(kind)),
+        icon,
         h('div', { class: 'item-main' }, name, metaLine),
         actions);
 
@@ -346,6 +350,20 @@
       state.fullText = { id, text: td.decode(await fetchPlain(it)) };
       state.expanded.clear(); state.expanded.add(id);
       render();
+    } catch (e) { alert(e.message); }
+  }
+  const canQuickLook = !!(desktop && desktop.quickLook);
+  async function peek(it, meta) {
+    if (canQuickLook) {
+      try { await desktop.quickLook({ name: meta.name, bytes: new Uint8Array(await fetchPlain(it)) }); } catch (e) { alert(e.message); }
+      return;
+    }
+    if ((meta.type || '').startsWith('image/')) return toggleImage(it.id);
+    try {
+      const url = URL.createObjectURL(new Blob([await fetchPlain(it)], { type: meta.type }));
+      const w = window.open(url, '_blank');
+      if (!w) download(it, meta);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) { alert(e.message); }
   }
   async function toggleImage(id) {
@@ -399,9 +417,39 @@
       await refresh();
     } catch (e) { row.error(e.message); }
   }
+  // ---------- thumbnails (made by the sender, travel encrypted inside the item's metadata) ----------
+  const THUMB_PX = 144, THUMB_MAX_CHARS = 48 * 1024;
+  async function imageThumb(file) {
+    const bmp = await createImageBitmap(file).catch(() => null);
+    if (!bmp) return null;
+    const scale = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(bmp.width * scale)); c.height = Math.max(1, Math.round(bmp.height * scale));
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    return c.toDataURL('image/jpeg', 0.74);
+  }
+  async function makeThumb(file, bytes) {
+    try {
+      let t = null;
+      if ((file.type || '').startsWith('image/')) t = await imageThumb(file);
+      if (!t && desktop && desktop.thumbnail && bytes.byteLength <= 64 * 1024 * 1024) t = await desktop.thumbnail({ name: file.name, bytes: new Uint8Array(bytes) });
+      return t && t.length <= THUMB_MAX_CHARS ? t : null;
+    } catch { return null; }
+  }
+
   async function sendFile(file) {
     const name = file.name || ('clipboard-' + Date.now() + (file.type ? '.' + (file.type.split('/')[1] || 'bin').replace('jpeg', 'jpg') : ''));
-    await sendBytes(await file.arrayBuffer(), { kind: 'file', name, type: file.type || 'application/octet-stream' }, name);
+    const bytes = await file.arrayBuffer();
+    const meta = { kind: 'file', name, type: file.type || guessType(name) };
+    const thumb = await makeThumb(file, bytes);
+    if (thumb) meta.thumb = thumb;
+    await sendBytes(bytes, meta, name);
+  }
+  function guessType(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    return { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', svg: 'image/svg+xml',
+      mp4: 'video/mp4', mov: 'video/quicktime', mp3: 'audio/mpeg', m4a: 'audio/mp4', zip: 'application/zip', txt: 'text/plain', md: 'text/markdown', json: 'application/json' }[ext] || 'application/octet-stream';
   }
   async function sendText(text) {
     text = text.replace(/\r\n/g, '\n');

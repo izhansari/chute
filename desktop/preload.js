@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('chute', {
   hide: () => ipcRenderer.send('hide'),
   togglePinned: () => ipcRenderer.invoke('toggle-pinned'),
   info: () => ipcRenderer.invoke('app-info'),
+  thumbnail: (f) => ipcRenderer.invoke('thumbnail', { name: String(f.name || ''), bytes: f.bytes }),
+  quickLook: (f) => ipcRenderer.invoke('quick-look', { name: String(f.name || ''), bytes: f.bytes }),
   onDropFiles: (cb) => { ipcRenderer.on('drop-files', (_e, files) => cb(files)); },
   onDropText: (cb) => { ipcRenderer.on('drop-text', (_e, text) => cb(String(text))); },
   onShown: (cb) => { ipcRenderer.on('shown', () => cb()); },

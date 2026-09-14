@@ -24,7 +24,9 @@
   html.win .titlebar { height: 8px; }
   main { flex: 1; overflow: auto; padding: 0 28px 4px; }
   .hero { padding-top: 0; }
-  .footer { flex: 0 0 auto; padding: 12px 28px 20px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .footer { flex: 0 0 auto; padding: 10px 28px 20px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .footer .error { flex: 1 1 100%; text-align: left; margin-bottom: 6px; line-height: 1.4; word-break: break-word; }
+  .footer .error:empty { display: none; }
 
   /* hero */
   .hero { text-align: center; padding: 0 0 16px; }
@@ -51,7 +53,11 @@
   /* text fields */
   .field { width: 100%; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); outline: none; transition: border-color .12s, box-shadow .12s; }
   .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .field.mini { width: 74px; text-align: right; padding-right: 8px; }
+  .field.mini { width: 78px; text-align: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+  .select { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; padding: 5px 28px 5px 10px; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 14px; }
+  .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .unit { color: var(--muted); font-size: 12px; margin-left: 6px; width: 24px; }
   .with-btn { position: relative; }
   .with-btn .field { padding-right: 36px; }
@@ -96,7 +102,7 @@
   .btn.primary { background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 80%, var(--accent-2))); border-color: transparent; color: #fff; box-shadow: 0 1px 2px rgba(52,120,246,.35); }
   .btn.primary:hover { filter: brightness(1.06); }
   .btn:disabled { opacity: .6; cursor: default; }
-  .error { color: var(--danger); font-size: 12.5px; flex: 1; }
+  .error { color: var(--danger); font-size: 12.5px; }
   .panel[hidden] { display: none; }
 </style>
 </head>
@@ -145,15 +151,21 @@
       <div class="group">
         <div class="row">
           <div class="grow"><div class="label">Keep items for</div><div class="sub">Then they're deleted automatically</div></div>
-          <input class="field mini" type="number" id="ttl" min="1" max="720" value="24"><span class="unit">hours</span>
+          <select class="select" id="ttl">
+            <option value="1">1 hour</option><option value="6">6 hours</option><option value="12">12 hours</option>
+            <option value="24" selected>1 day</option><option value="72">3 days</option><option value="168">1 week</option>
+          </select>
         </div>
         <div class="row">
           <div class="grow"><div class="label">Maximum item size</div></div>
-          <input class="field mini" type="number" id="max" min="1" max="4096" value="512"><span class="unit">MB</span>
+          <select class="select" id="max">
+            <option value="100">100 MB</option><option value="250">250 MB</option><option value="512" selected>512 MB</option>
+            <option value="1024">1 GB</option><option value="2048">2 GB</option>
+          </select>
         </div>
         <div class="row">
-          <div class="grow"><div class="label">Port</div></div>
-          <input class="field mini" type="number" id="port" min="1024" max="65535" value="8443"><span class="unit"></span>
+          <div class="grow"><div class="label">Port</div><div class="sub">Only change this if another app uses it</div></div>
+          <input class="field mini" type="text" inputmode="numeric" pattern="[0-9]*" id="port" value="8443" maxlength="5">
         </div>
       </div>
       <div id="hostUrls" hidden>
