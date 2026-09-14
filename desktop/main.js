@@ -195,8 +195,8 @@ function toggleMain() { if (win && win.isVisible()) win.hide(); else showMain();
 function openSettings() {
   if (settingsWin) { settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = new BrowserWindow({
-    width: 520, height: 720, resizable: true, title: 'Chute Settings', show: false, icon: path.join(ICONS, 'icon-256.png'),
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f2f2f7',
+    width: 480, height: 640, resizable: false, fullscreenable: false, maximizable: false, title: 'Chute', show: false, icon: path.join(ICONS, 'icon-256.png'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e21' : '#f2f2f7',
     titleBarStyle: IS_MAC ? 'hiddenInset' : 'default',
     webPreferences: { preload: path.join(__dirname, 'settings-preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
@@ -367,6 +367,13 @@ ipcMain.handle('settings:save', async (e, s) => {
 });
 ipcMain.on('settings:close', () => { if (settingsWin) settingsWin.close(); });
 ipcMain.on('settings:open-external', (e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
+ipcMain.handle('settings:copy', (e, text) => { clipboard.writeText(String(text).slice(0, 4096)); return true; });
+ipcMain.on('settings:resize', (e, h) => {
+  if (!settingsWin || !Number.isFinite(h)) return;
+  const wa = screen.getDisplayMatching(settingsWin.getBounds()).workArea;
+  const [w] = settingsWin.getContentSize();
+  settingsWin.setContentSize(w, Math.max(420, Math.min(Math.round(h), wa.height - 60)), true);
+});
 
 // Downloads go straight to ~/Downloads with a notification instead of a save dialog.
 function wireDownloads() {
@@ -423,8 +430,11 @@ async function runSelfTest() {
 
     openSettings();
     await new Promise((r) => settingsWin.webContents.once('did-finish-load', r));
-    await wait(1200);
-    fs.writeFileSync(path.join(out, 'settings.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    await wait(1500);
+    fs.writeFileSync(path.join(out, 'settings-host.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    await settingsWin.webContents.executeJavaScript('document.getElementById("segConnect").click(); true');
+    await wait(700);
+    fs.writeFileSync(path.join(out, 'settings-join.png'), (await settingsWin.webContents.capturePage()).toPNG());
     settingsWin.close();
 
     createMainWindow();

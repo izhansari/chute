@@ -2,86 +2,181 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
-<title>Chute Settings</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self'">
+<title>Chute</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --text:#1a1d21; --muted:#6b7280; --border:#e3e6ea; --accent:#2563eb; --danger:#dc2626; --dz:#eef2ff; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1216; --card:#171b21; --text:#e6e8eb; --muted:#9aa3ad; --border:#2a3038; --accent:#3b82f6; --danger:#f87171; --dz:#1b2130; } }
+  :root {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+    --bg: #f2f2f7; --surface: #fff; --surface-2: #f4f4f8; --text: #1d1d1f; --muted: #6e6e73;
+    --border: rgba(0,0,0,.09); --border-strong: rgba(0,0,0,.16); --accent: #3478f6; --accent-2: #6a5cff; --accent-soft: rgba(52,120,246,.12);
+    --danger: #e5453c; --success: #34c759; --seg: rgba(0,0,0,.06); --shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1e1e21; --surface: #2a2a2e; --surface-2: #35353a; --text: #f5f5f7; --muted: #98989d;
+      --border: rgba(255,255,255,.09); --border-strong: rgba(255,255,255,.18); --accent: #4b8dff; --accent-2: #8a7dff; --accent-soft: rgba(75,141,255,.18);
+      --danger: #ff5f57; --success: #30d158; --seg: rgba(255,255,255,.08); --shadow: none; }
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; padding-top: 34px; -webkit-user-select: none; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px 22px 28px; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 22px 0 8px; }
-  p { margin: 0 0 8px; } .muted { color: var(--muted); } .small { font-size: 12.5px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
-  .mode { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
-  .mode input { margin-top: 4px; }
-  .mode strong { display: block; }
-  .fields { margin-top: 10px; padding-left: 26px; display: none; }
-  .card.active .fields { display: block; }
-  label.f { display: block; margin: 8px 0 4px; font-weight: 600; font-size: 13px; }
-  input[type=text], input[type=password], input[type=number] { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-  .row { display: flex; gap: 10px; } .row > * { flex: 1; }
-  .found { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .found li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--dz); font-size: 13px; }
-  .found button { padding: 4px 10px; }
-  .check { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-  .btn { font: inherit; padding: 8px 16px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--text); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 13px/1.45 var(--font); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; -webkit-user-select: none; display: flex; flex-direction: column; }
+  input, textarea { -webkit-user-select: text; font-family: var(--font); }
+  .titlebar { height: 38px; flex: 0 0 auto; -webkit-app-region: drag; }
+  html.win .titlebar { height: 8px; }
+  main { flex: 1; overflow: auto; padding: 0 28px 4px; }
+  .hero { padding-top: 0; }
+  .footer { flex: 0 0 auto; padding: 12px 28px 20px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+
+  /* hero */
+  .hero { text-align: center; padding: 0 0 16px; }
+  .hero img { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(52,120,246,.25); }
+  .hero h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin: 12px 0 2px; }
+  .hero p { margin: 0; color: var(--muted); font-size: 13px; }
+
+  /* segmented control */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; position: relative; background: var(--seg); border-radius: 9px; padding: 2px; margin: 0 auto 16px; max-width: 320px; }
+  .seg button { position: relative; z-index: 1; border: 0; background: transparent; padding: 6px 10px; border-radius: 7px; font: inherit; font-weight: 500; color: var(--muted); cursor: pointer; transition: color .15s; }
+  .seg button.on { color: var(--text); }
+  .seg .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); border-radius: 7px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.15); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+  .seg.host .thumb { transform: translateX(100%); }
+
+  /* grouped lists (System Settings style) */
+  .group { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 14px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 44px; }
+  .row + .row { border-top: 1px solid var(--border); }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .label { font-weight: 500; }
+  .row .sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .section-title { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 2px 0 6px 6px; }
+
+  /* text fields */
+  .field { width: 100%; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); outline: none; transition: border-color .12s, box-shadow .12s; }
+  .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field.mini { width: 74px; text-align: right; padding-right: 8px; }
+  .unit { color: var(--muted); font-size: 12px; margin-left: 6px; width: 24px; }
+  .with-btn { position: relative; }
+  .with-btn .field { padding-right: 36px; }
+  .with-btn .icon-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
+  .icon-btn { width: 28px; height: 28px; border: 0; background: transparent; color: var(--muted); border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .icon-btn:hover { background: var(--seg); color: var(--text); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 6px 0; }
+  .field-row { padding: 12px 14px; }
+  .field-row + .field-row { border-top: 1px solid var(--border); }
+  .field-row label.top { display: block; font-weight: 500; margin-bottom: 6px; }
+  .inline-fields { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .inline-fields > div { display: flex; align-items: center; gap: 8px; }
+  .inline-fields label { color: var(--muted); }
+
+  /* discovered hosts */
+  .host-row { cursor: pointer; }
+  .host-row:hover { background: var(--surface-2); }
+  .host-row .pc { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .host-row .pc svg { width: 18px; height: 18px; }
+  .host-row .tick { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; }
+  .host-row.selected .tick { background: var(--accent); border-color: var(--accent); }
+  .host-row .tick svg { width: 12px; height: 12px; display: none; }
+  .host-row.selected .tick svg { display: block; }
+  .scanning { color: var(--muted); }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex: 0 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* address chip */
+  .addr { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; color: var(--text); }
+
+  /* switches */
+  .switch { appearance: none; width: 40px; height: 24px; border-radius: 12px; background: var(--seg); border: 1px solid var(--border-strong); position: relative; cursor: pointer; margin: 0; transition: background .15s, border-color .15s; flex: 0 0 auto; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+  .switch:checked { background: var(--success); border-color: var(--success); }
+  .switch:checked::after { transform: translateX(16px); }
+  .switch:disabled { opacity: .45; cursor: default; }
+
+  /* buttons */
+  .btn { font: inherit; font-weight: 500; font-size: 13px; padding: 7px 16px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); min-width: 88px; transition: filter .12s, transform .08s; }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 80%, var(--accent-2))); border-color: transparent; color: #fff; box-shadow: 0 1px 2px rgba(52,120,246,.35); }
+  .btn.primary:hover { filter: brightness(1.06); }
   .btn:disabled { opacity: .6; cursor: default; }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-  .error { color: var(--danger); margin-top: 8px; }
-  .urls { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-top: 8px; word-break: break-all; }
-  .urls a { color: var(--accent); text-decoration: none; }
-  .titlebar { position: fixed; top: 0; left: 0; right: 0; height: 34px; -webkit-app-region: drag; }
-  input, textarea { -webkit-user-select: text; }
+  .error { color: var(--danger); font-size: 12.5px; flex: 1; }
+  .panel[hidden] { display: none; }
 </style>
 </head>
 <body>
   <div class="titlebar"></div>
-  <h1>Chute</h1>
-  <p class="muted">Toss files and text to people on this network. Everything is end-to-end encrypted with a passphrase you all share.</p>
-
-  <h2>Where is the chute?</h2>
-  <div class="card" id="cardConnect">
-    <label class="mode"><input type="radio" name="mode" value="connect" id="modeConnect">
-      <span><strong>Connect to a teammate's chute</strong><span class="muted small">Someone else on the network is hosting it.</span></span></label>
-    <div class="fields">
-      <label class="f" for="serverUrl">Address</label>
-      <input type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false">
-      <p class="muted small" id="scanMsg" style="margin-top:6px">Looking for chutes on this network…</p>
-      <ul class="found" id="found"></ul>
+  <main><div class="content">
+    <div class="hero">
+      <img src="icons/icon-256.png" alt="">
+      <h1>Chute</h1>
+      <p>Toss files and text to teammates. Encrypted, gone in a day.</p>
     </div>
-  </div>
-  <div class="card" id="cardHost">
-    <label class="mode"><input type="radio" name="mode" value="host" id="modeHost">
-      <span><strong>Host the chute on this computer</strong><span class="muted small">Runs quietly in the background while this computer is on.</span></span></label>
-    <div class="fields">
-      <label class="f" for="pass">Shared passphrase</label>
-      <input type="password" id="pass" placeholder="At least 8 characters" autocomplete="new-password">
-      <p class="muted small" id="passHint">Give it to your teammates in person. It is never stored or sent anywhere.</p>
-      <div class="row">
-        <div><label class="f" for="ttl">Keep items for (hours)</label><input type="number" id="ttl" min="1" max="720" value="24"></div>
-        <div><label class="f" for="max">Max size (MB)</label><input type="number" id="max" min="1" max="4096" value="512"></div>
-        <div><label class="f" for="port">Port</label><input type="number" id="port" min="1024" max="65535" value="8443"></div>
+
+    <div class="seg" id="seg">
+      <div class="thumb"></div>
+      <button type="button" id="segConnect" class="on">Join a chute</button>
+      <button type="button" id="segHost">Host a chute</button>
+    </div>
+
+    <!-- JOIN -->
+    <div class="panel" id="panelConnect">
+      <div class="section-title">On your network</div>
+      <div class="group" id="hostList">
+        <div class="row scanning" id="scanRow"><div class="spinner"></div><div class="grow">Looking for chutes nearby…</div></div>
+      </div>
+      <div class="group">
+        <div class="field-row">
+          <label class="top" for="serverUrl">Or enter an address</label>
+          <input class="field" type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <!-- HOST -->
+    <div class="panel" id="panelHost" hidden>
+      <div class="section-title">Passphrase</div>
+      <div class="group">
+        <div class="field-row">
+          <div class="with-btn">
+            <input class="field" type="password" id="pass" placeholder="At least 8 characters" autocomplete="new-password">
+            <button class="icon-btn" type="button" id="togglePass" title="Show passphrase"></button>
+          </div>
+          <div class="hint" id="passHint">Share it with teammates in person. It is never stored or sent anywhere.</div>
+        </div>
+      </div>
+      <div class="section-title">Options</div>
+      <div class="group">
+        <div class="row">
+          <div class="grow"><div class="label">Keep items for</div><div class="sub">Then they're deleted automatically</div></div>
+          <input class="field mini" type="number" id="ttl" min="1" max="720" value="24"><span class="unit">hours</span>
+        </div>
+        <div class="row">
+          <div class="grow"><div class="label">Maximum item size</div></div>
+          <input class="field mini" type="number" id="max" min="1" max="4096" value="512"><span class="unit">MB</span>
+        </div>
+        <div class="row">
+          <div class="grow"><div class="label">Port</div></div>
+          <input class="field mini" type="number" id="port" min="1024" max="65535" value="8443"><span class="unit"></span>
+        </div>
       </div>
       <div id="hostUrls" hidden>
-        <label class="f">Teammates open one of these</label>
-        <div class="urls" id="urlList"></div>
-        <p class="muted small" style="margin-top:6px">Or they install Chute and pick this computer from the list.</p>
+        <div class="section-title">Your address</div>
+        <div class="group">
+          <div class="row">
+            <div class="grow"><div class="addr" id="primaryUrl"></div><div class="sub">Teammates pick this computer from their list, or open this address in a browser.</div></div>
+            <button class="icon-btn" type="button" id="copyUrl" title="Copy addresses"></button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <h2>Behaviour</h2>
-  <div class="card">
-    <label class="check"><input type="checkbox" id="notifications" checked> Notify me when something new arrives</label>
-    <label class="check"><input type="checkbox" id="launchAtLogin"> Launch at login <span class="muted small" id="loginHint"></span></label>
-  </div>
-
-  <p class="error" id="error" hidden></p>
-  <div class="actions">
+    <div class="section-title">Behaviour</div>
+    <div class="group">
+      <label class="row"><div class="grow"><div class="label">Notify me when something arrives</div></div><input type="checkbox" class="switch" id="notifications" checked></label>
+      <label class="row"><div class="grow"><div class="label">Launch at login</div><div class="sub" id="loginHint" hidden>Available in the installed app</div></div><input type="checkbox" class="switch" id="launchAtLogin"></label>
+    </div>
+  </div></main>
+  <div class="footer">
+    <span class="error" id="error"></span>
     <button class="btn" id="cancel" type="button">Cancel</button>
-    <button class="btn primary" id="save" type="button">Save &amp; open</button>
+    <button class="btn primary" id="save" type="button">Open Chute</button>
   </div>
   <script src="settings.js"></script>
 </body>
