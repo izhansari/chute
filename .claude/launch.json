@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lan-drop",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 8443,
+      "url": "https://localhost:8443"
+    }
+  ]
+}

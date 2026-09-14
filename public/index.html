@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>LAN Drop</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">📦</span>
+    <div>
+      <h1>LAN Drop</h1>
+      <p class="sub" id="subline">End-to-end encrypted. Items disappear automatically.</p>
+    </div>
+  </div>
+  <div class="top-actions" id="topActions" hidden>
+    <span class="pill" id="statusPill">locked</span>
+    <button class="btn ghost small" id="lockBtn" title="Forget the passphrase on this device">Lock</button>
+  </div>
+</header>
+
+<main>
+  <section id="insecure" class="card warn" hidden>
+    <strong>This page must be opened over HTTPS.</strong>
+    <p>Encryption is unavailable on plain http. Use the <code>https://</code> address printed by the server.</p>
+  </section>
+
+  <section id="gate" class="card gate">
+    <h2>Enter the shared passphrase</h2>
+    <p class="muted">The passphrase never leaves this device. It unlocks the drop and decrypts what's inside.</p>
+    <form id="gateForm" autocomplete="off">
+      <input id="passInput" type="password" placeholder="Passphrase" autocomplete="current-password" required minlength="8">
+      <label class="check"><input type="checkbox" id="rememberBox"> Remember on this device</label>
+      <button class="btn primary" id="unlockBtn" type="submit">Unlock</button>
+    </form>
+    <p class="error" id="gateError" hidden></p>
+  </section>
+
+  <section id="app" hidden>
+    <div id="dropzone" class="dropzone" tabindex="0">
+      <div class="dz-inner">
+        <div class="dz-icon">⬇︎</div>
+        <div class="dz-text">
+          <strong>Drop files here</strong> or <button class="linkish" id="chooseBtn" type="button">choose files</button>
+          <div class="muted small">Or just paste (⌘V / Ctrl+V) anywhere on this page — text, screenshots, files.</div>
+        </div>
+      </div>
+      <input type="file" id="fileInput" multiple hidden>
+    </div>
+
+    <form id="textForm" class="textbox">
+      <textarea id="textInput" rows="3" placeholder="Type or paste text to share…"></textarea>
+      <div class="textbox-actions">
+        <span class="muted small">⌘/Ctrl + Enter to send</span>
+        <button class="btn primary small" type="submit">Send text</button>
+      </div>
+    </form>
+
+    <div id="uploads" class="uploads"></div>
+
+    <div class="list-head">
+      <h2>In the drop</h2>
+      <span class="muted small" id="listInfo"></span>
+    </div>
+    <ul id="items" class="items"></ul>
+    <p id="empty" class="empty muted" hidden>Nothing here yet. Drop something in.</p>
+  </section>
+</main>
+
+<footer class="muted small">
+  Only ciphertext ever reaches the server. Anyone with the passphrase and access to this network can read the drop.
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
