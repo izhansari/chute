@@ -1,7 +1,7 @@
 {
-  "name": "lan-drop",
+  "name": "chute",
   "version": "1.0.0",
-  "description": "Tiny end-to-end encrypted temporary dropbox for people on the same network",
+  "description": "Chute: toss files and text to people on your network. End-to-end encrypted, gone in a day.",
   "private": true,
   "main": "desktop/main.js",
   "scripts": {
@@ -26,9 +26,9 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "dev.landrop.app",
-    "productName": "LAN Drop",
-    "artifactName": "LAN-Drop-${version}-${os}-${arch}.${ext}",
+    "appId": "app.chute.desktop",
+    "productName": "Chute",
+    "artifactName": "Chute-${version}-${os}-${arch}.${ext}",
     "directories": { "output": "dist" },
     "files": [
       "desktop/**/*",

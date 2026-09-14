@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
-<title>LAN Drop Settings</title>
+<title>Chute Settings</title>
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --text:#1a1d21; --muted:#6b7280; --border:#e3e6ea; --accent:#2563eb; --danger:#dc2626; --dz:#eef2ff; }
   @media (prefers-color-scheme: dark) { :root { --bg:#0f1216; --card:#171b21; --text:#e6e8eb; --muted:#9aa3ad; --border:#2a3038; --accent:#3b82f6; --danger:#f87171; --dz:#1b2130; } }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px 22px 28px; }
+  body { margin: 0; padding-top: 34px; -webkit-user-select: none; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px 22px 28px; }
   h1 { font-size: 18px; margin: 0 0 4px; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 22px 0 8px; }
   p { margin: 0 0 8px; } .muted { color: var(--muted); } .small { font-size: 12.5px; }
@@ -32,26 +32,29 @@
   .error { color: var(--danger); margin-top: 8px; }
   .urls { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-top: 8px; word-break: break-all; }
   .urls a { color: var(--accent); text-decoration: none; }
+  .titlebar { position: fixed; top: 0; left: 0; right: 0; height: 34px; -webkit-app-region: drag; }
+  input, textarea { -webkit-user-select: text; }
 </style>
 </head>
 <body>
-  <h1>LAN Drop</h1>
-  <p class="muted">Share text and files with people on this network. Everything is end-to-end encrypted with a passphrase you all share.</p>
+  <div class="titlebar"></div>
+  <h1>Chute</h1>
+  <p class="muted">Toss files and text to people on this network. Everything is end-to-end encrypted with a passphrase you all share.</p>
 
-  <h2>Where is the drop?</h2>
+  <h2>Where is the chute?</h2>
   <div class="card" id="cardConnect">
     <label class="mode"><input type="radio" name="mode" value="connect" id="modeConnect">
-      <span><strong>Connect to a teammate's drop</strong><span class="muted small">Someone else on the network is hosting it.</span></span></label>
+      <span><strong>Connect to a teammate's chute</strong><span class="muted small">Someone else on the network is hosting it.</span></span></label>
     <div class="fields">
       <label class="f" for="serverUrl">Address</label>
       <input type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false">
-      <p class="muted small" id="scanMsg" style="margin-top:6px">Looking for drops on this network…</p>
+      <p class="muted small" id="scanMsg" style="margin-top:6px">Looking for chutes on this network…</p>
       <ul class="found" id="found"></ul>
     </div>
   </div>
   <div class="card" id="cardHost">
     <label class="mode"><input type="radio" name="mode" value="host" id="modeHost">
-      <span><strong>Host the drop on this computer</strong><span class="muted small">Runs quietly in the background while this computer is on.</span></span></label>
+      <span><strong>Host the chute on this computer</strong><span class="muted small">Runs quietly in the background while this computer is on.</span></span></label>
     <div class="fields">
       <label class="f" for="pass">Shared passphrase</label>
       <input type="password" id="pass" placeholder="At least 8 characters" autocomplete="new-password">
@@ -64,7 +67,7 @@
       <div id="hostUrls" hidden>
         <label class="f">Teammates open one of these</label>
         <div class="urls" id="urlList"></div>
-        <p class="muted small" style="margin-top:6px">Or they install LAN Drop and pick this computer from the list.</p>
+        <p class="muted small" style="margin-top:6px">Or they install Chute and pick this computer from the list.</p>
       </div>
     </div>
   </div>

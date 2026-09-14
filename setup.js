@@ -43,7 +43,7 @@ async function main() {
   }
   let pass = arg('pass', process.env.DROP_PASS || '');
   if (!pass) {
-    console.log('LAN Drop setup\n');
+    console.log('Chute setup\n');
     console.log('Pick a shared passphrase. Everyone on your team types this once in their browser.');
     console.log('It is never stored anywhere and never sent to the server.\n');
     pass = await promptHidden('Passphrase: ');

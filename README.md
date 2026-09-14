@@ -1,7 +1,7 @@
-# LAN Drop
+# Chute
 
-A tiny, end-to-end encrypted dropbox for people on the same network. Paste or drag
-something in on one machine, grab it on another. Everything expires on its own.
+Toss files and text to people on the same network. Drop something in on one machine,
+it pops out on everyone else's. End-to-end encrypted, gone in a day.
 
 - **Nothing to install on the other devices.** One machine runs the server; everyone
   else just opens a URL in a browser (Mac, Windows, Linux, phone).
@@ -17,10 +17,10 @@ something in on one machine, grab it on another. Everything expires on its own.
 
 ## Two ways to run it
 
-1. **Desktop app** (recommended): a menu bar / system tray app for Mac and Windows. One
-   person picks "Host", everyone else picks their computer from a list. Native
-   notifications, drop files on the tray icon, send the clipboard from the tray menu,
-   launch at login. No certificate warnings.
+1. **Desktop app** (recommended): a menu bar app on Mac and a system tray app on Windows.
+   One person picks "Host", everyone else picks their computer from a list. Native
+   notifications and an unread badge, drop files on the menu bar icon, send the clipboard
+   from the tray menu, launch at login. No certificate warnings.
 2. **Plain server + browser**: run `npm start` on one machine, everyone else opens a URL.
    Zero dependencies, works from any device with a browser, including phones.
 
@@ -44,17 +44,19 @@ npm run desktop
 
 First launch opens Settings:
 
-- **Host the drop on this computer**: choose the shared passphrase. The drop runs in the
+- **Host the chute on this computer**: choose the shared passphrase. The chute runs in the
   background whenever this computer is on and announces itself on the network.
-- **Connect to a teammate's drop**: hosts on the network appear in a list; click **Use**.
+- **Connect to a teammate's chute**: hosts on the network appear in a list; click **Use**.
   You can also type an address such as `https://their-mac.local:8443`.
 
-Then click the tray icon to open the drop. Everything else is the same web UI described
-below, plus:
+Then click the menu bar / tray icon: a popover opens under it and closes when you click
+away. Pin it (the pin button, or "Keep window open" in the tray menu) while you drag
+things in from Finder or Explorer. Everything else is the same web UI described below, plus:
 
-- **Notifications** when someone else adds something (click to open the drop).
+- **Notifications** when someone else adds something, and an unread count next to the
+  menu bar icon (a red dot on Windows) until you open the chute. New items are marked.
 - **Drop files onto the menu bar icon** (Mac) to send them without opening the window.
-- **Send clipboard to the drop** from the tray menu: text or a screenshot you just copied.
+- **Send clipboard** from the tray menu: text or a screenshot you just copied.
 - **Downloads** land in your Downloads folder with a notification; click it to reveal.
 - **Launch at login** from the tray menu, so it is always there.
 - The host's self-signed certificate is remembered on first connection (trust on first
@@ -64,7 +66,7 @@ The installers are unsigned. On first open, macOS will say the app is from an
 unidentified developer: right-click the app and choose **Open**. Windows SmartScreen
 shows "More info → Run anyway".
 
-## Plain server: setup (once, on the machine that will host the drop)
+## Plain server: setup (once, on the machine that will host the chute)
 
 Requirements: Node.js 18+ and OpenSSL (already on macOS and Linux; on Windows
 `winget install ShiningLight.OpenSSL`).
@@ -135,7 +137,7 @@ That is the normal limit of any web-based end-to-end encryption.
 - `lib/setup.js`: key derivation, certificate generation, config writing
 - `server.js`, `setup.js`: command-line entry points
 - `public/`: the web UI, served by the host and loaded by the desktop app
-- `desktop/`: Electron shell (tray, notifications, settings, discovery, cert pinning)
+- `desktop/`: Electron shell (popover, tray, badge, notifications, settings, discovery, cert pinning)
 
 ## Notes
 

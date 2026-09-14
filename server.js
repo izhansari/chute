@@ -18,7 +18,7 @@ const drop = createLanDrop({ config, dataDir: path.join(ROOT, 'data'), allowPubl
 
 drop.start().then(() => {
   const u = drop.urls();
-  console.log('LAN Drop is running (end-to-end encrypted, items expire after %dh)\n', config.ttlHours);
+  console.log('Chute is running (end-to-end encrypted, items expire after %dh)\n', config.ttlHours);
   console.log('Open one of these on any device on the same network:');
   for (const url of u.lan) console.log('  ' + url);
   console.log(`\nOn this machine only (no certificate warning):\n  ${u.local}`);

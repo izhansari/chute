@@ -20,7 +20,7 @@
       btn.addEventListener('click', () => { $('#serverUrl').value = svc.url; setMode('connect'); });
       li.append(label, btn); ul.append(li);
     }
-    $('#scanMsg').textContent = found.size ? 'Found on this network:' : 'Looking for drops on this network…';
+    $('#scanMsg').textContent = found.size ? 'Found on this network:' : 'Looking for chutes on this network…';
   }
   api.onDiscovered((svc) => { found.set(svc.url, svc); renderFound(); });
 

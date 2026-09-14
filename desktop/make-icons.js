@@ -56,7 +56,7 @@ function inArrow(x, y) {
   return stem || head || tray;
 }
 
-function render(size, { bg, fg, template, pad = 0 }) {
+function render(size, { bg, bg2, fg, template, pad = 0, dot = false }) {
   const SS = 4; // supersampling
   const buf = Buffer.alloc(size * size * 4);
   for (let py = 0; py < size; py++) {
@@ -70,6 +70,16 @@ function render(size, { bg, fg, template, pad = 0 }) {
         if (inArrow(x, y)) arrow++; else cover++;
       }
       const i = (py * size + px) * 4;
+      // red notification dot, top-right
+      if (dot) {
+        const dx = (px + 0.5) / size - 0.78, dy = (py + 0.5) / size - 0.22;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 0.2) {
+          const ring = d > 0.15 ? 1 - (d - 0.15) / 0.05 : 1; // soft edge
+          buf[i] = 255; buf[i + 1] = 59; buf[i + 2] = 48; buf[i + 3] = Math.round(255 * Math.max(0, Math.min(1, ring)));
+          continue;
+        }
+      }
       if (template) {
         // monochrome: arrow is the glyph, rest transparent
         const a = Math.round(255 * arrow / (SS * SS));
@@ -78,7 +88,9 @@ function render(size, { bg, fg, template, pad = 0 }) {
         const total = cover + arrow;
         const a = total / (SS * SS);
         const fa = arrow / (SS * SS), ba = cover / (SS * SS);
-        const mix = (c) => a === 0 ? 0 : Math.round((bg[c] * ba + fg[c] * fa) / a);
+        const t = py / size;
+        const g = bg2 ? bg.map((c, k) => Math.round(c * (1 - t) + bg2[k] * t)) : bg;
+        const mix = (c) => a === 0 ? 0 : Math.round((g[c] * ba + fg[c] * fa) / a);
         buf[i] = mix(0); buf[i + 1] = mix(1); buf[i + 2] = mix(2); buf[i + 3] = Math.round(255 * a);
       }
     }
@@ -86,11 +98,13 @@ function render(size, { bg, fg, template, pad = 0 }) {
   return encodePNG(size, size, buf);
 }
 
-const blue = [37, 99, 235], white = [255, 255, 255];
-fs.writeFileSync(path.join(OUT, 'icon.png'), render(512, { bg: blue, fg: white, pad: 0.04 }));
-fs.writeFileSync(path.join(OUT, 'icon-256.png'), render(256, { bg: blue, fg: white, pad: 0.04 }));
+const blue = [52, 120, 246], indigo = [106, 92, 255], white = [255, 255, 255];
+fs.writeFileSync(path.join(OUT, 'icon.png'), render(512, { bg: blue, bg2: indigo, fg: white, pad: 0.04 }));
+fs.writeFileSync(path.join(OUT, 'icon-256.png'), render(256, { bg: blue, bg2: indigo, fg: white, pad: 0.04 }));
 fs.writeFileSync(path.join(OUT, 'trayTemplate.png'), render(16, { template: true }));
 fs.writeFileSync(path.join(OUT, 'trayTemplate@2x.png'), render(32, { template: true }));
-fs.writeFileSync(path.join(OUT, 'tray.png'), render(32, { bg: blue, fg: white, pad: 0.02 }));
-fs.writeFileSync(path.join(OUT, 'tray-16.png'), render(16, { bg: blue, fg: white, pad: 0.02 }));
+fs.writeFileSync(path.join(OUT, 'tray.png'), render(32, { bg: blue, bg2: indigo, fg: white, pad: 0.02 }));
+fs.writeFileSync(path.join(OUT, 'tray-16.png'), render(16, { bg: blue, bg2: indigo, fg: white, pad: 0.02 }));
+fs.writeFileSync(path.join(OUT, 'tray-badge.png'), render(32, { bg: blue, bg2: indigo, fg: white, pad: 0.02, dot: true }));
+fs.writeFileSync(path.join(OUT, 'tray-badge-16.png'), render(16, { bg: blue, bg2: indigo, fg: white, pad: 0.02, dot: true }));
 console.log('icons written to', OUT);

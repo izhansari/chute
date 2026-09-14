@@ -4,80 +4,79 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>LAN Drop</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E">
+<title>Chute</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%233478f6'/%3E%3Cpath d='M12 5v9m0 0l-3.5-3.5M12 14l3.5-3.5M7 18h10' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <span class="logo">📦</span>
-    <div>
-      <h1>LAN Drop</h1>
-      <p class="sub" id="subline">End-to-end encrypted. Items disappear automatically.</p>
+<div class="arrow" aria-hidden="true"></div>
+<div class="shell">
+  <header class="top" id="header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6"/><path d="M12 5v9m0 0l-3.5-3.5M12 14l3.5-3.5M7 18h10"/></svg>
+      <h1>Chute</h1>
+      <span class="status" id="status"><i></i><span id="statusText">Locked</span></span>
     </div>
-  </div>
-  <div class="top-right">
-    <div class="top-actions" id="topActions" hidden>
-      <span class="pill" id="statusPill">locked</span>
-      <button class="btn ghost small" id="lockBtn" title="Forget the passphrase on this device">Lock</button>
+    <div class="top-right">
+      <button class="icon-btn" id="pinBtn" title="Keep open while you drag things in" hidden></button>
+      <button class="icon-btn" id="lockBtn" title="Lock and forget the passphrase on this device" hidden></button>
+      <button class="icon-btn" id="settingsBtn" title="Settings" hidden></button>
     </div>
-    <button class="btn ghost small" id="settingsBtn" title="LAN Drop settings" hidden>⚙︎</button>
-  </div>
-</header>
+  </header>
 
-<main>
-  <section id="insecure" class="card warn" hidden>
-    <strong>This page must be opened over HTTPS.</strong>
-    <p>Encryption is unavailable on plain http. Use the <code>https://</code> address printed by the server.</p>
-  </section>
+  <main>
+    <section id="insecure" class="card warn" hidden>
+      <strong>Open this page over HTTPS.</strong>
+      <p>Encryption is unavailable on plain http. Use the <code>https://</code> address printed by the host.</p>
+    </section>
 
-  <section id="gate" class="card gate">
-    <h2>Enter the shared passphrase</h2>
-    <p class="muted">The passphrase never leaves this device. It unlocks the drop and decrypts what's inside.</p>
-    <form id="gateForm" autocomplete="off">
-      <input id="passInput" type="password" placeholder="Passphrase" autocomplete="current-password" required minlength="8">
-      <label class="check"><input type="checkbox" id="rememberBox"> Remember on this device</label>
-      <button class="btn primary" id="unlockBtn" type="submit">Unlock</button>
-    </form>
-    <p class="error" id="gateError" hidden></p>
-  </section>
+    <section id="gate" class="card gate">
+      <div class="gate-icon" id="gateIcon"></div>
+      <h2>Enter the shared passphrase</h2>
+      <p class="muted">It never leaves this device. It unlocks the chute and decrypts what's inside.</p>
+      <form id="gateForm" autocomplete="off">
+        <input id="passInput" type="password" placeholder="Passphrase" autocomplete="current-password" required minlength="8">
+        <label class="check"><input type="checkbox" id="rememberBox"> Remember on this device</label>
+        <button class="btn primary" id="unlockBtn" type="submit">Unlock</button>
+      </form>
+      <p class="error" id="gateError" hidden></p>
+    </section>
 
-  <section id="app" hidden>
-    <div id="dropzone" class="dropzone" tabindex="0">
-      <div class="dz-inner">
-        <div class="dz-icon">⬇︎</div>
+    <section id="app" hidden>
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Add files">
+        <div class="dz-icon" id="dzIcon"></div>
         <div class="dz-text">
-          <strong>Drop files here</strong> or <button class="linkish" id="chooseBtn" type="button">choose files</button>
-          <div class="muted small">Or just paste (⌘V / Ctrl+V) anywhere on this page — text, screenshots, files.</div>
+          <strong>Drop files here</strong>
+          <span class="muted">or <button class="linkish" id="chooseBtn" type="button">browse</button> · paste anywhere</span>
         </div>
+        <input type="file" id="fileInput" multiple hidden>
       </div>
-      <input type="file" id="fileInput" multiple hidden>
-    </div>
 
-    <form id="textForm" class="textbox">
-      <textarea id="textInput" rows="3" placeholder="Type or paste text to share…"></textarea>
-      <div class="textbox-actions">
-        <span class="muted small">⌘/Ctrl + Enter to send</span>
-        <button class="btn primary small" type="submit">Send text</button>
+      <form id="textForm" class="composer">
+        <textarea id="textInput" rows="1" placeholder="Type or paste text…"></textarea>
+        <button class="send-btn" id="sendBtn" type="submit" title="Send (⌘/Ctrl + Enter)" disabled></button>
+      </form>
+
+      <div id="uploads" class="uploads"></div>
+
+      <div class="list-head">
+        <h2>In the chute</h2>
+        <span class="muted small" id="listInfo"></span>
       </div>
-    </form>
+      <ul id="items" class="items"></ul>
+      <div id="empty" class="empty" hidden>
+        <div class="empty-art" id="emptyArt"></div>
+        <strong>Nothing here yet</strong>
+        <p class="muted">Drop a file, paste some text, or send your clipboard from the menu bar icon. Whatever you add shows up on everyone's device.</p>
+      </div>
+    </section>
+  </main>
 
-    <div id="uploads" class="uploads"></div>
-
-    <div class="list-head">
-      <h2>In the drop</h2>
-      <span class="muted small" id="listInfo"></span>
-    </div>
-    <ul id="items" class="items"></ul>
-    <p id="empty" class="empty muted" hidden>Nothing here yet. Drop something in.</p>
-  </section>
-</main>
-
-<footer class="muted small">
-  Only ciphertext ever reaches the server. Anyone with the passphrase and access to this network can read the drop.
-</footer>
-
+  <footer class="muted small" id="footer">
+    Only ciphertext ever reaches the host. Anyone with the passphrase and access to this network can read the chute.
+  </footer>
+</div>
+<div id="dropOverlay" class="drop-overlay" hidden><div><div id="overlayIcon"></div>Drop to send</div></div>
 <script src="/app.js"></script>
 </body>
 </html>
