@@ -298,7 +298,11 @@ let refreshTray = () => {};
 
 function applyLoginItem() {
   if (!app.isPackaged) return; // in dev this would register the Electron binary itself
-  app.setLoginItemSettings({ openAtLogin: !!settings.launchAtLogin, openAsHidden: true, args: ['--hidden'] });
+  try {
+    const current = app.getLoginItemSettings().openAtLogin;
+    if (current === !!settings.launchAtLogin) return; // nothing to change
+    app.setLoginItemSettings({ openAtLogin: !!settings.launchAtLogin, openAsHidden: true, args: ['--hidden'] });
+  } catch (e) { console.log('[login item]', e.message); }
 }
 
 // ---------- IPC ----------
