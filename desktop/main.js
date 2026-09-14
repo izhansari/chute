@@ -89,7 +89,10 @@ function advertise(port) {
   if (!b) return;
   try {
     const host = os.hostname().split('.')[0];
-    mdnsService = b.publish({ name: `LAN Drop on ${host}`, type: 'lan-drop', port, txt: { v: '1', host } });
+    // Advertise under our own mDNS hostname. Answering for the machine's real
+    // "<host>.local" name from a second responder makes macOS think the name is
+    // taken and rename the computer to "<host>-2".
+    mdnsService = b.publish({ name: `LAN Drop on ${host}`, type: 'lan-drop', port, host: `lan-drop-${host.toLowerCase()}.local`, txt: { v: '1', host } });
   } catch (e) { console.log('[mdns] publish failed:', e.message); }
 }
 function unadvertise() {
