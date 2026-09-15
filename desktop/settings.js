@@ -48,7 +48,7 @@
   wireReveal($('#revealJoinPass'), $('#joinCurrentPass'));
   $('#changePassBtn').addEventListener('click', () => { $('#rowNewPass').hidden = false; $('#changePassBtn').disabled = true; $('#pass').focus(); fit(); });
   $('#changeJoinPassBtn').addEventListener('click', () => { $('#rowJoinNewPass').hidden = false; $('#changeJoinPassBtn').disabled = true; $('#joinPass').focus(); fit(); });
-  document.querySelector('details.adv').addEventListener('toggle', (e) => { fit(); if (e.target.open) setTimeout(() => e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80); });
+  for (const d of document.querySelectorAll('details.adv')) d.addEventListener('toggle', (e) => { fit(); if (e.target.open) setTimeout(() => e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80); });
 
   // ---------- window sizing ----------
   let fitTimer = null;
@@ -56,6 +56,19 @@
     clearTimeout(fitTimer);
     fitTimer = setTimeout(() => api.resize($('.titlebar').offsetHeight + $('.content').offsetHeight + 4 + $('.footer').offsetHeight), 30);
   }
+
+  // ---------- dirty tracking (settings mode shows Done until something changes) ----------
+  let snapshot = '';
+  const formState = () => JSON.stringify([...document.querySelectorAll('main input, main select')].map((el) => (el.type === 'checkbox' ? el.checked : el.value)));
+  function takeSnapshot() { snapshot = formState(); updateFooter(); }
+  function updateFooter() {
+    if (firstRun || step !== 'details') return;
+    const dirty = formState() !== snapshot;
+    $('#cancel').hidden = !dirty; $('#primary').hidden = !dirty; $('#done').hidden = dirty;
+  }
+  document.querySelector('main').addEventListener('input', updateFooter);
+  document.querySelector('main').addEventListener('change', updateFooter);
+  $('#done').addEventListener('click', () => api.close());
 
   // ---------- steps ----------
   const stepEl = { welcome: $('#stepWelcome'), choose: $('#stepChoose'), join: $('#stepJoin'), host: $('#stepHost'), done: $('#stepDone') };
@@ -76,17 +89,17 @@
     [...dots.children].forEach((d, i) => { d.classList.toggle('on', i === idx); d.classList.toggle('done', i < idx); });
 
     const primary = $('#primary'), cancel = $('#cancel'), back = $('#back');
-    primary.hidden = false; back.hidden = true; cancel.hidden = true; primary.classList.remove('wide');
+    primary.hidden = false; back.hidden = true; cancel.hidden = true; $('#done').hidden = true; primary.classList.remove('wide');
     if (name === 'welcome') { primary.textContent = 'Get started'; primary.classList.add('wide'); }
     else if (name === 'choose') { primary.hidden = true; back.hidden = false; }
     else if (name === 'details') {
       if (firstRun) { back.hidden = false; primary.textContent = mode === 'host' ? 'Start hosting' : 'Join'; }
-      else { cancel.hidden = false; primary.textContent = 'Save'; }
+      else { primary.textContent = 'Save'; updateFooter(); }
     }
     else if (name === 'done') { primary.textContent = 'Open Chute'; primary.classList.add('wide'); }
     fit();
     const focus = { details: mode === 'host' ? '#pass' : '#joinPass' }[name];
-    if (focus) setTimeout(() => $(focus).focus(), 60);
+    if (focus) setTimeout(() => { $(focus).focus({ preventScroll: true }); document.querySelector('main').scrollTop = 0; }, 60);
   }
   function chooseMode(m) { mode = m; showStep('details'); }
   $('#chooseHost').addEventListener('click', () => chooseMode('host'));
@@ -129,7 +142,7 @@
   }
   function showUrls(u) {
     lastUrls = u;
-    $('#primaryUrl').textContent = u.lan[0]; $('#hostUrls').hidden = false; copyButton($('#copyUrl'), u);
+    $('#primaryUrl').textContent = u.lan[0]; $('#addrRow').hidden = !!firstRun; copyButton($('#copyUrl'), u);
     $('#donePrimaryUrl').textContent = u.lan[0]; $('#doneUrls').hidden = false; copyButton($('#doneCopyUrl'), u);
     fit();
   }
@@ -159,10 +172,16 @@
     if (s.mode === 'connect' && !firstRun) {
       $('#rowJoinCurrentPass').hidden = false; $('#rowJoinNewPass').hidden = true; $('#joinPassLabel').textContent = 'New passphrase';
       $('#joinPassHint').textContent = 'Use this if the host changed the passphrase.';
+      $('#connGroup').append($('#rowJoinCurrentPass'), $('#rowJoinNewPass')); // one Connection group: host, limits, passphrase
+      $('#joinPassGroup').hidden = true;
+      const sw = $('#switchChute'); sw.classList.remove('quiet'); sw.open = false;
     }
     $('#dangerHost').hidden = !(s.mode === 'host' && s.hostConfigured);
     $('#dangerJoin').hidden = s.mode !== 'connect';
-    $('#rowStop').hidden = !!s.hostPaused; $('#rowResume').hidden = !s.hostPaused;
+    const toggle = $('#hostToggleBtn');
+    toggle.textContent = s.hostPaused ? 'Start' : 'Stop…';
+    toggle.classList.toggle('primary', !!s.hostPaused);
+    toggle.onclick = async () => { if (await api.hostAction(s.hostPaused ? 'resume' : 'stop')) location.reload(); };
     $('#downloadDir').textContent = s.downloadDir || '';
     const fmtTtl = (h) => (!h ? '…' : h % 24 === 0 ? (h / 24) + ' day' + (h === 24 ? '' : 's') : h + ' hours');
     const fmtMB = (mb) => (!mb ? '…' : mb >= 1024 ? (mb / 1024) + ' GB' : mb + ' MB');
@@ -176,7 +195,8 @@
       $('#connLimits').textContent = s.serverInfo ? `Items expire after ${fmtTtl(s.serverInfo.ttlHours)} · up to ${fmtMB(s.serverInfo.maxMB)} per item` : 'Unlock the chute to see the host\'s settings';
     }
     if (s.mode === 'host' && !firstRun) {
-      $('#connHostInfo').hidden = false;
+      $('#chuteTitle').textContent = 'Chute';
+      $('#hostStateRow').hidden = false;
       const st = $('#hostState');
       if (s.hostPaused) { $('#hostStateLabel').textContent = 'Hosting is paused'; $('#hostStateSub').textContent = 'The chute is off the network.'; st.textContent = 'Paused'; st.className = 'state pause'; }
       else { $('#hostStateLabel').textContent = 'Hosting'; $('#hostStateSub').textContent = `${s.connectedDevices} device${s.connectedDevices === 1 ? '' : 's'} connected right now`; st.textContent = 'Live'; st.className = 'state ok'; }
@@ -189,6 +209,7 @@
     if (s.hostUrls) showUrls(s.hostUrls);
     renderFound();
     showStep(firstRun ? 'welcome' : 'details');
+    takeSnapshot();
   }
 
   // ---------- actions ----------
@@ -220,8 +241,6 @@
   $('#doneLaunch').addEventListener('change', () => api.update({ launchAtLogin: $('#doneLaunch').checked }));
 
   $('#emptyBtn').addEventListener('click', async () => { if (await api.hostAction('empty')) $('#error').textContent = ''; });
-  $('#stopBtn').addEventListener('click', async () => { if (await api.hostAction('stop')) location.reload(); });
-  $('#resumeBtn').addEventListener('click', async () => { if (await api.hostAction('resume')) location.reload(); });
   $('#deleteBtn').addEventListener('click', async () => { if (await api.hostAction('delete')) location.reload(); });
   $('#chooseDir').addEventListener('click', async () => { $('#downloadDir').textContent = await api.chooseDir(); fit(); });
   $('#leaveBtn').addEventListener('click', async () => { if (await api.hostAction('leave')) location.reload(); });

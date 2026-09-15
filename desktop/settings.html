@@ -59,8 +59,10 @@
   .seg.host .thumb { transform: translateX(100%); }
 
   /* grouped lists */
-  .group { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 14px; }
-  .row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 44px; }
+  .group { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 12px; }
+  .section-title + .group { margin-top: 0; }
+  details.adv.quiet summary { display: none; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 8px 14px; min-height: 40px; }
   .row + .row, .row + .field-row, .field-row + .row { border-top: 1px solid var(--border); }
   .row .grow { flex: 1; min-width: 0; }
   .row .label { font-weight: 500; }
@@ -201,11 +203,12 @@
       </div>
       <div id="connJoin" hidden>
         <div class="section-title">Connection</div>
-        <div class="group">
+        <div class="group" id="connGroup">
           <div class="row"><div class="pc" data-icon="pc" style="width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center"></div><div class="grow"><div class="label" id="connHost"></div><div class="sub addr" id="connAddr"></div></div><span class="state" id="connState"></span></div>
           <div class="row"><div class="grow"><div class="label">Host's settings</div><div class="sub" id="connLimits">Items expire after … · max … per item</div></div></div>
         </div>
       </div>
+      <details class="adv quiet" id="switchChute" open><summary>Join a different chute</summary>
       <div class="panel" id="panelConnect">
         <div class="section-title">On your network</div>
         <div class="group" id="hostList"></div>
@@ -214,6 +217,10 @@
             <label class="top" for="serverUrl">Or enter an address</label>
             <input class="field" type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false" autocomplete="off">
           </div>
+        </div>
+      </div>
+      </details>
+      <div class="group" id="joinPassGroup">
           <div class="row" id="rowJoinCurrentPass" hidden>
             <div class="grow"><div class="label addr" id="joinCurrentPass">••••••••••</div><div class="sub">The chute's passphrase, as saved on this device.</div></div>
             <button class="icon-btn" type="button" id="revealJoinPass" title="Show passphrase"></button>
@@ -227,9 +234,7 @@
             </div>
             <div class="hint" id="joinPassHint">Stays on this device. You can also type it in the chute window later.</div>
           </div>
-        </div>
       </div>
-
     </section>
 
     <!-- STEP: host -->
@@ -239,15 +244,10 @@
         <h1 id="hostTitle">Host a chute</h1>
         <p id="hostSub">Choose a passphrase. Your teammates will use it to join.</p>
       </div>
-      <div id="connHostInfo" hidden>
-        <div class="section-title">Status</div>
-        <div class="group">
-          <div class="row"><div class="grow"><div class="label" id="hostStateLabel">Hosting</div><div class="sub" id="hostStateSub"></div></div><span class="state" id="hostState"></span></div>
-        </div>
-      </div>
       <div class="panel" id="panelHost">
-        <div class="section-title">Passphrase</div>
-        <div class="group">
+        <div class="section-title" id="chuteTitle">Passphrase</div>
+        <div class="group" id="chuteGroup">
+          <div class="row" id="hostStateRow" hidden><div class="grow"><div class="label" id="hostStateLabel">Hosting</div><div class="sub" id="hostStateSub"></div></div><span class="state" id="hostState"></span><button class="btn" type="button" id="hostToggleBtn">Stop…</button></div>
           <div class="row" id="rowCurrentPass" hidden>
             <div class="grow"><div class="label addr" id="currentPass">••••••••••</div><div class="sub">Teammates need this to join.</div></div>
             <button class="icon-btn" type="button" id="revealPass" title="Show passphrase"></button>
@@ -260,6 +260,10 @@
               <button class="icon-btn" type="button" data-toggle="pass" title="Show passphrase"></button>
             </div>
             <div class="hint" id="passHint">Share it with teammates in person. It never leaves this computer.</div>
+          </div>
+          <div class="row" id="addrRow" hidden>
+            <div class="grow"><div class="addr" id="primaryUrl"></div><div class="sub">Teammates pick this computer from their list, or open this in a browser.</div></div>
+            <button class="icon-btn" type="button" id="copyUrl" title="Copy addresses"></button>
           </div>
         </div>
         <div class="section-title">Options</div>
@@ -294,15 +298,6 @@
             </div>
           </div>
         </details>
-        <div id="hostUrls" hidden>
-          <div class="section-title">Your address</div>
-          <div class="group">
-            <div class="row">
-              <div class="grow"><div class="addr" id="primaryUrl"></div><div class="sub">Teammates pick this computer from their list, or open this address in a browser.</div></div>
-              <button class="icon-btn" type="button" id="copyUrl" title="Copy addresses"></button>
-            </div>
-          </div>
-        </div>
       </div>
 
     </section>
@@ -318,10 +313,7 @@
       <div id="dangerHost" hidden>
         <div class="section-title">This chute</div>
         <div class="group">
-          <div class="row" id="rowStop"><div class="grow"><div class="label">Stop hosting</div><div class="sub">Takes the chute off the network. You choose whether to keep the items.</div></div><button class="btn" type="button" id="stopBtn">Stop…</button></div>
-          <div class="row" id="rowResume" hidden><div class="grow"><div class="label">Start hosting again</div><div class="sub">Puts the chute back on the network with the same passphrase.</div></div><button class="btn primary" type="button" id="resumeBtn">Start</button></div>
-          <div class="row"><div class="grow"><div class="label">Empty the chute</div><div class="sub">Deletes everything in it now. Keeps hosting.</div></div><button class="btn danger" type="button" id="emptyBtn">Empty…</button></div>
-          <div class="row"><div class="grow"><div class="label">Delete this chute</div><div class="sub">Stops hosting, deletes everything, forgets the passphrase.</div></div><button class="btn danger" type="button" id="deleteBtn">Delete…</button></div>
+          <div class="row"><div class="grow"><div class="label">Empty or delete</div><div class="sub">Empty removes every item but keeps hosting. Delete also stops hosting and forgets the passphrase.</div></div><button class="btn danger" type="button" id="emptyBtn">Empty…</button><button class="btn danger" type="button" id="deleteBtn">Delete…</button></div>
         </div>
       </div>
       <div id="dangerJoin" hidden>
@@ -365,6 +357,7 @@
     <button class="btn" id="back" type="button" hidden>Back</button>
     <span class="spacer"></span>
     <button class="btn" id="cancel" type="button">Cancel</button>
+    <button class="btn" id="done" type="button" hidden>Done</button>
     <button class="btn primary" id="primary" type="button">Continue</button>
   </div>
   <script src="settings.js"></script>

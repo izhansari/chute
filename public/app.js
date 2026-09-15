@@ -603,7 +603,7 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) markSeenSoon(); });
 
   if (desktop) {
-    document.documentElement.classList.add('desktop', IS_MAC ? 'mac' : 'win');
+    document.documentElement.classList.add('desktop', IS_MAC ? 'mac' : 'win'); // normally already set by the server
     el.settingsBtn.hidden = false; el.pinBtn.hidden = false;
     el.stopBtn.addEventListener('click', () => desktop.stopHosting());
     el.status.addEventListener('click', () => { if (state.info && state.info.mode === 'host' && state.token) desktop.stopHosting(); });

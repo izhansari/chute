@@ -66,12 +66,15 @@ function normalizeUrl(input) {
   return u.toString();
 }
 const PAUSED_URL = require('url').pathToFileURL(path.join(__dirname, 'paused.html')).href;
+const DESKTOP_QS = '?desktop=' + process.platform;
 function targetUrl() {
   if (settings.mode === 'host' && settings.hostPaused) return PAUSED_URL;
-  if (settings.mode === 'host' && drop) return `http://127.0.0.1:${drop.localPort}/`;
-  if (settings.mode === 'connect' && settings.serverUrl) return settings.serverUrl;
+  if (settings.mode === 'host' && drop) return `http://127.0.0.1:${drop.localPort}/` + DESKTOP_QS;
+  if (settings.mode === 'connect' && settings.serverUrl) return settings.serverUrl + DESKTOP_QS;
   return null;
 }
+// "is the popover already showing this target?" — compare without the query string
+const sameOrigin = (a, b) => { try { return new URL(a).origin === new URL(b).origin && new URL(a).pathname === new URL(b).pathname; } catch { return a === b; } };
 
 // ---------- host server + discovery ----------
 async function startHost() {
@@ -174,7 +177,7 @@ function createMainWindow() {
   win.webContents.on('did-finish-load', () => { if (settings.hostPaused && win.webContents.getURL() === PAUSED_URL) return; });
   win.on('focus', () => clearUnread());
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
-  win.webContents.on('will-navigate', (e, url) => { const t = targetUrl(); if (!t || !url.startsWith(t)) e.preventDefault(); });
+  win.webContents.on('will-navigate', (e, url) => { const t = targetUrl(); if (!t || !sameOrigin(url, t)) e.preventDefault(); });
   win.webContents.on('did-fail-load', (e, code, desc, url, isMainFrame) => {
     if (!isMainFrame || code === -3) return;
     win.loadFile(path.join(__dirname, 'offline.html'), { query: { url: targetUrl() || '', reason: desc } });
@@ -211,7 +214,7 @@ function ensureLoaded() {
   if (!win) createMainWindow();
   const t = targetUrl();
   if (!t) return false;
-  if (!win.webContents.getURL().startsWith(t)) loadInto(t);
+  if (!sameOrigin(win.webContents.getURL(), t)) loadInto(t);
   return true;
 }
 // Navigate the popover without a white flash: hide first, show again once the new page has painted.
@@ -596,7 +599,7 @@ ipcMain.on('settings:resize', (e, h) => {
   if (!settingsWin || !Number.isFinite(h)) return;
   const wa = screen.getDisplayMatching(settingsWin.getBounds()).workArea;
   const [w] = settingsWin.getContentSize();
-  settingsWin.setContentSize(w, Math.max(420, Math.min(Math.round(h), wa.height - 60)), true);
+  settingsWin.setContentSize(w, Math.max(420, Math.min(Math.round(h), Math.round(wa.height * 0.85))), true);
 });
 
 // Downloads go straight to ~/Downloads with a notification instead of a save dialog.
@@ -678,8 +681,12 @@ async function runSelfTest() {
     results.passphraseRecalled = recallPassphrase() === 'test-passphrase-123';
     results.maxTotalMB = hostConfig().maxTotalMB;
     openSettings();
+    const consoleLines = [];
+    settingsWin.webContents.on('console-message', (e, level, msg) => { if (level >= 2) consoleLines.push(msg); });
     await new Promise((r) => settingsWin.webContents.once('did-finish-load', r));
     await wait(1200);
+    results.settingsConsole = consoleLines;
+    results.settingsFit = await settingsWin.webContents.executeJavaScript('({ tb: document.querySelector(".titlebar").offsetHeight, content: document.querySelector(".content").offsetHeight, footer: document.querySelector(".footer").offsetHeight, inner: window.innerHeight })');
     fs.writeFileSync(path.join(out, 'settings-later.png'), (await settingsWin.webContents.capturePage()).toPNG());
     settingsWin.close();
     results.urls = drop ? drop.urls() : null;
