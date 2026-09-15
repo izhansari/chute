@@ -49,6 +49,7 @@
       "icon": "desktop/icons/icon.png",
       "target": [{ "target": "nsis", "arch": ["x64"] }]
     },
+    "dmg": { "title": "Chute", "contents": [{ "x": 130, "y": 170 }, { "x": 410, "y": 170, "type": "link", "path": "/Applications" }] },
     "nsis": { "oneClick": true, "perMachine": false, "runAfterFinish": true },
     "linux": { "target": ["AppImage"], "icon": "desktop/icons/icon.png", "category": "Utility" }
   }
