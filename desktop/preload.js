@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld('chute', {
   onDropText: (cb) => { ipcRenderer.on('drop-text', (_e, text) => cb(String(text))); },
   onShown: (cb) => { ipcRenderer.on('shown', () => cb()); },
   onPinned: (cb) => { ipcRenderer.on('pinned', (_e, v) => cb(!!v)); },
+  onLock: (cb) => { ipcRenderer.on('lock', () => cb()); },
 });

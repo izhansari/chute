@@ -194,7 +194,7 @@ function showMain() {
 function toggleMain() { if (win && win.isVisible()) win.hide(); else showMain(); }
 
 function openSettings() {
-  if (settingsWin) { settingsWin.show(); settingsWin.focus(); return; }
+  if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = new BrowserWindow({
     width: 480, height: 640, resizable: false, fullscreenable: false, maximizable: false, title: 'Chute', show: false, icon: path.join(ICONS, 'icon-256.png'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e21' : '#f2f2f7',
@@ -204,7 +204,11 @@ function openSettings() {
   settingsWin.setMenuBarVisibility(false);
   settingsWin.loadFile(path.join(__dirname, 'settings.html'));
   settingsWin.once('ready-to-show', () => { settingsWin.show(); if (IS_MAC) app.dock.show(); });
-  settingsWin.on('closed', () => { settingsWin = null; stopDiscovery(); if (IS_MAC && !SELF_TEST) app.dock.hide(); });
+  settingsWin.on('closed', () => {
+    settingsWin = null; stopDiscovery();
+    if (IS_MAC && !SELF_TEST) app.dock.hide();
+    if (!settings.mode && !quitting && !SELF_TEST) notify('Chute is still here', 'Click the icon in your menu bar whenever you want to finish setting up.', openSettings);
+  });
   startDiscovery((svc) => { if (settingsWin) settingsWin.webContents.send('discovered', svc); });
 }
 
@@ -285,6 +289,7 @@ function buildTrayMenu() {
       { label: 'Leave this chute…', click: async () => { if (await confirm(null, 'Leave this chute?', 'This device forgets the address and passphrase. Nothing is deleted for anyone else.', 'Leave')) { await leaveChute(); openSettings(); } } },
       { type: 'separator' },
     ] : []),
+    ...(settings.mode ? [{ label: 'Lock this device', click: lockDevice }, { type: 'separator' }] : []),
     { label: 'Keep window open', type: 'checkbox', checked: settings.pinned, click: (mi) => { settings.pinned = mi.checked; saveSettings(); if (win) win.webContents.send('pinned', settings.pinned); } },
     { label: 'Notifications', type: 'checkbox', checked: settings.notifications, click: (mi) => { settings.notifications = mi.checked; saveSettings(); } },
     { label: 'Launch at login', type: 'checkbox', checked: settings.launchAtLogin, click: (mi) => { settings.launchAtLogin = mi.checked; saveSettings(); applyLoginItem(); } },
@@ -359,7 +364,7 @@ ipcMain.on('notify', (e, payload) => {
 });
 ipcMain.on('clear-unread', () => clearUnread());
 ipcMain.on('open-settings', () => openSettings());
-ipcMain.on('hide', () => { if (win && !settings.pinned) win.hide(); });
+ipcMain.on('hide', () => { if (win) win.hide(); }); // explicit close (× or Esc) always wins, even when pinned
 ipcMain.on('choose-files', () => chooseFilesDialog());
 ipcMain.handle('toggle-pinned', () => { settings.pinned = !settings.pinned; saveSettings(); return settings.pinned; });
 ipcMain.handle('thumbnail', (e, f) => thumbnailFor(f && f.name, f && f.bytes));
@@ -411,6 +416,16 @@ ipcMain.handle('settings:save', async (e, s) => {
 });
 ipcMain.on('settings:close', () => { if (settingsWin) settingsWin.close(); });
 ipcMain.on('settings:finish', () => { if (settingsWin) settingsWin.close(); showMain(); });
+ipcMain.handle('settings:update', (e, patch) => {
+  if (patch && typeof patch === 'object') {
+    if ('launchAtLogin' in patch) { settings.launchAtLogin = !!patch.launchAtLogin; applyLoginItem(); }
+    if ('notifications' in patch) settings.notifications = !!patch.notifications;
+    saveSettings(); refreshTray();
+  }
+  return true;
+});
+function lockDevice() { if (win) win.webContents.send('lock'); }
+ipcMain.handle('settings:lock-device', () => { lockDevice(); return true; });
 
 async function confirm(parent, message, detail, button) {
   const { response } = await dialog.showMessageBox(parent || undefined, { type: 'warning', buttons: ['Cancel', button], defaultId: 0, cancelId: 0, message, detail });
@@ -519,15 +534,27 @@ async function runSelfTest() {
     fs.writeFileSync(path.join(out, 'onboard-welcome.png'), (await settingsWin.webContents.capturePage()).toPNG());
     await settingsWin.webContents.executeJavaScript('document.getElementById("primary").click(); true');
     await wait(900);
+    fs.writeFileSync(path.join(out, 'onboard-choose.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    results.dots = await settingsWin.webContents.executeJavaScript('(() => { const d = document.querySelectorAll("#dots i"); const r = d[1].getBoundingClientRect(); return { count: d.length, onIndex: [...d].findIndex(x => x.classList.contains("on")), w: r.width, h: r.height, top: r.top }; })()');
+    await settingsWin.webContents.executeJavaScript('document.getElementById("chooseJoin").click(); true');
+    await wait(900);
     fs.writeFileSync(path.join(out, 'onboard-join.png'), (await settingsWin.webContents.capturePage()).toPNG());
-    await settingsWin.webContents.executeJavaScript('document.getElementById("segHost").click(); document.getElementById("pass").value = "test-passphrase-123"; document.getElementById("port").value = "8543"; true');
-    await wait(500);
+    await settingsWin.webContents.executeJavaScript('document.getElementById("back").click(); true');
+    await wait(400);
+    await settingsWin.webContents.executeJavaScript('document.getElementById("chooseHost").click(); document.getElementById("pass").value = "test-passphrase-123"; document.getElementById("port").value = "8543"; true');
+    await wait(700);
     fs.writeFileSync(path.join(out, 'onboard-host.png'), (await settingsWin.webContents.capturePage()).toPNG());
     await settingsWin.webContents.executeJavaScript('document.getElementById("primary").click(); true'); // saves: writes config, starts host, hands passphrase to the page
     await wait(3000);
     fs.writeFileSync(path.join(out, 'onboard-done.png'), (await settingsWin.webContents.capturePage()).toPNG());
     settingsWin.close();
+    await wait(400);
     results.modeAfterSetup = settings.mode;
+    openSettings();
+    await new Promise((r) => settingsWin.webContents.once('did-finish-load', r));
+    await wait(1200);
+    fs.writeFileSync(path.join(out, 'settings-later.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    settingsWin.close();
     results.urls = drop ? drop.urls() : null;
 
     // The popover must come up already unlocked (no second passphrase prompt)

@@ -42,9 +42,9 @@ Or run it straight from source while developing:
 npm run desktop
 ```
 
-First launch walks you through it: a short welcome, then one screen to either host a
-chute or join one (with the passphrase), then a "you're in" page. The passphrase you
-enter there also unlocks the chute window, so you type it once.
+First launch walks you through it one step at a time: welcome, host or join, the details
+for that choice (passphrase and, for hosts, a couple of options), then a "you're in" page.
+The passphrase you enter there also unlocks the chute window, so you type it once.
 
 Later, the gear button in the window (or "Settings…" in the tray menu) opens the same
 screen:
@@ -75,8 +75,10 @@ things in from Finder or Explorer. Everything else is the same web UI described 
 
 ### Locking, leaving, and closing a chute
 
-- **Lock** (padlock in the window) only forgets the passphrase on *this device*. The chute
-  keeps running and nothing is deleted. Unlock again by typing the passphrase.
+- **Close the window** with the × (or Esc, or click anywhere else). Nothing happens to the
+  chute; it's just out of the way.
+- **Lock this device** (tray menu, or Settings) only forgets the passphrase on *this device*.
+  The chute keeps running and nothing is deleted. Unlock again by typing the passphrase.
 - **Quit Chute** closes the app. If you are the host, the chute is offline until you open
   Chute again; the items are still there when it comes back (until they expire).
 - **Empty the chute** (host, tray menu or Settings) deletes everything in it right now for

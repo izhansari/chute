@@ -28,6 +28,7 @@
     file: '<path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/>',
     media: '<circle cx="12" cy="12" r="8.5"/><path d="M10 9l5 3-5 3z"/>',
     inbox: '<path d="M4 13l2.5-8h11L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/><path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
   };
   function svg(name, cls = '') {
     const t = document.createElement('template');
@@ -39,14 +40,14 @@
   const el = {
     insecure: $('#insecure'), gate: $('#gate'), gateForm: $('#gateForm'), pass: $('#passInput'), remember: $('#rememberBox'),
     unlockBtn: $('#unlockBtn'), gateError: $('#gateError'), gateIcon: $('#gateIcon'),
-    app: $('#app'), status: $('#status'), statusText: $('#statusText'), lockBtn: $('#lockBtn'), pinBtn: $('#pinBtn'), settingsBtn: $('#settingsBtn'),
+    app: $('#app'), status: $('#status'), statusText: $('#statusText'), lockBtn: $('#lockBtn'), pinBtn: $('#pinBtn'), settingsBtn: $('#settingsBtn'), closeBtn: $('#closeBtn'),
     dropzone: $('#dropzone'), dzIcon: $('#dzIcon'), chooseBtn: $('#chooseBtn'), fileInput: $('#fileInput'),
     textForm: $('#textForm'), textInput: $('#textInput'), sendBtn: $('#sendBtn'), uploads: $('#uploads'),
     items: $('#items'), empty: $('#empty'), emptyArt: $('#emptyArt'), listInfo: $('#listInfo'),
     overlay: $('#dropOverlay'), overlayIcon: $('#overlayIcon'),
   };
   setIcon(el.gateIcon, 'key'); setIcon(el.dzIcon, 'chute'); setIcon(el.sendBtn, 'send'); setIcon(el.emptyArt, 'inbox'); setIcon(el.overlayIcon, 'chute');
-  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear');
+  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear'); setIcon(el.closeBtn, 'close');
 
   const state = {
     token: null, key: null, server: null, clockOffset: 0,
@@ -157,7 +158,7 @@
     el.pass.focus();
   }
   function showApp() {
-    el.gate.hidden = true; el.app.hidden = false; el.lockBtn.hidden = false;
+    el.gate.hidden = true; el.app.hidden = false; el.lockBtn.hidden = !!desktop;
     el.status.classList.add('on');
     el.statusText.textContent = desktop ? (state.info && state.info.mode === 'host' ? 'Hosting' : 'Connected') : location.host;
     el.status.title = `Items expire after ${state.server.ttlHours}h · max ${state.server.maxMB} MB each`;
@@ -503,7 +504,9 @@
 
   if (desktop) {
     document.documentElement.classList.add('desktop', IS_MAC ? 'mac' : 'win');
-    el.settingsBtn.hidden = false; el.pinBtn.hidden = false;
+    el.settingsBtn.hidden = false; el.pinBtn.hidden = false; el.closeBtn.hidden = false;
+    el.closeBtn.addEventListener('click', () => desktop.hide());
+    desktop.onLock(() => lock());
     const hint = document.getElementById('gateDesktopHint'); if (hint) hint.hidden = false;
     el.settingsBtn.addEventListener('click', () => desktop.openSettings());
     el.pinBtn.addEventListener('click', async () => { const pinned = await desktop.togglePinned(); el.pinBtn.classList.toggle('active', pinned); });

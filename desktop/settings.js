@@ -2,11 +2,12 @@
   const $ = (s) => document.querySelector(s);
   const api = window.settingsApi;
   const found = new Map();
-  let mode = 'connect';
+  let mode = null;          // 'host' | 'connect'
   let selectedUrl = '';
-  let step = 'setup';
+  let step = 'welcome';
   let firstRun = false;
   let lastUrls = null;
+  const ORDER = ['welcome', 'choose', 'details', 'done'];
 
   const ICON = {
     eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -17,6 +18,9 @@
     chute: '<path d="M12 3v11m0 0l-4-4m4 4l4-4M5 19h14"/>',
     lock: '<rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+    people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4.5-6.2"/>',
+    chev: '<path d="M9 6l6 6-6 6"/>',
   };
   const svg = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
 
@@ -39,30 +43,39 @@
   }
 
   // ---------- steps ----------
+  const stepEl = { welcome: $('#stepWelcome'), choose: $('#stepChoose'), join: $('#stepJoin'), host: $('#stepHost'), done: $('#stepDone') };
   function showStep(name) {
     step = name;
-    for (const s of document.querySelectorAll('.step')) s.hidden = s.id !== 'step' + name[0].toUpperCase() + name.slice(1);
+    const visible = name === 'details' ? (mode === 'host' ? 'host' : 'join') : name;
+    for (const [k, el] of Object.entries(stepEl)) el.hidden = k !== visible;
     $('#error').textContent = '';
-    const primary = $('#primary'), cancel = $('#cancel'), back = $('#back');
-    back.hidden = true; cancel.hidden = false;
-    if (name === 'welcome') { primary.textContent = 'Get started'; primary.classList.add('wide'); cancel.hidden = true; }
-    else if (name === 'setup') { primary.textContent = firstRun ? 'Continue' : 'Save'; primary.classList.remove('wide'); back.hidden = !firstRun; }
-    else if (name === 'done') { primary.textContent = 'Open Chute'; primary.classList.add('wide'); cancel.hidden = true; }
-    fit();
-  }
 
-  function setMode(m) {
-    mode = m;
-    $('#seg').classList.toggle('host', m === 'host');
-    $('#segConnect').classList.toggle('on', m === 'connect');
-    $('#segHost').classList.toggle('on', m === 'host');
-    $('#panelConnect').hidden = m !== 'connect';
-    $('#panelHost').hidden = m !== 'host';
-    $('#error').textContent = '';
+    // settings-only extras live at the end of the details step
+    const extras = $('#extras');
+    if (!firstRun && name === 'details') { stepEl[visible].append(extras); extras.hidden = false; } else extras.hidden = true;
+
+    // progress dots (onboarding only)
+    const dots = $('#dots');
+    dots.hidden = !firstRun;
+    const idx = ORDER.indexOf(name);
+    [...dots.children].forEach((d, i) => { d.classList.toggle('on', i === idx); d.classList.toggle('done', i < idx); });
+
+    const primary = $('#primary'), cancel = $('#cancel'), back = $('#back');
+    primary.hidden = false; back.hidden = true; cancel.hidden = true; primary.classList.remove('wide');
+    if (name === 'welcome') { primary.textContent = 'Get started'; primary.classList.add('wide'); }
+    else if (name === 'choose') { primary.hidden = true; back.hidden = false; }
+    else if (name === 'details') {
+      if (firstRun) { back.hidden = false; primary.textContent = mode === 'host' ? 'Start hosting' : 'Join'; }
+      else { cancel.hidden = false; primary.textContent = 'Save'; }
+    }
+    else if (name === 'done') { primary.textContent = 'Open Chute'; primary.classList.add('wide'); }
     fit();
+    const focus = { details: mode === 'host' ? '#pass' : '#joinPass' }[name];
+    if (focus) setTimeout(() => $(focus).focus(), 60);
   }
-  $('#segConnect').addEventListener('click', () => setMode('connect'));
-  $('#segHost').addEventListener('click', () => setMode('host'));
+  function chooseMode(m) { mode = m; showStep('details'); }
+  $('#chooseHost').addEventListener('click', () => chooseMode('host'));
+  $('#chooseJoin').addEventListener('click', () => chooseMode('connect'));
 
   // ---------- discovery ----------
   function renderFound() {
@@ -109,7 +122,7 @@
   async function load() {
     const s = await api.get();
     firstRun = !s.mode;
-    setMode(s.mode || (s.hostConfigured ? 'host' : 'connect'));
+    mode = s.mode || null;
     $('#serverUrl').value = s.serverUrl || ''; selectedUrl = s.serverUrl || '';
     const pick = (sel, value, label) => {
       if (![...sel.options].some((o) => Number(o.value) === Number(value))) sel.add(new Option(label, String(value)));
@@ -120,44 +133,54 @@
     $('#port').value = s.host.port;
     $('#notifications').checked = !!s.notifications;
     $('#launchAtLogin').checked = !!s.launchAtLogin;
-    if (!s.canLoginItem) { $('#launchAtLogin').disabled = true; $('#loginHint').hidden = false; }
+    $('#doneLaunch').checked = !!s.launchAtLogin;
+    if (!s.canLoginItem) { $('#launchAtLogin').disabled = true; $('#loginHint').hidden = false; $('#doneLaunch').disabled = true; $('#doneLoginHint').textContent = 'Available in the installed app.'; }
     if (s.hostConfigured && s.mode === 'host') {
       $('#pass').placeholder = 'Leave blank to keep the current passphrase';
       $('#passHint').textContent = 'Entering a new passphrase clears everything currently in the chute.';
     }
-    if (s.mode === 'connect') { $('#joinPass').placeholder = 'Leave blank to keep the current passphrase'; }
+    if (s.mode === 'connect') $('#joinPass').placeholder = 'Leave blank to keep the current passphrase';
     $('#dangerHost').hidden = !(s.mode === 'host' && s.hostConfigured);
     $('#dangerJoin').hidden = s.mode !== 'connect';
-    if (!firstRun) { $('#setupTitle').textContent = 'Settings'; $('#setupSub').textContent = s.mode === 'host' ? 'You are hosting this chute.' : 'You are joined to a chute.'; }
+    if (!firstRun) {
+      document.documentElement.classList.add('compact');
+      $('#hostTitle').textContent = 'Settings'; $('#hostSub').textContent = 'You are hosting this chute.';
+      $('#joinTitle').textContent = 'Settings'; $('#joinSub').textContent = 'You are joined to a chute.';
+    }
     if (s.hostUrls) showUrls(s.hostUrls);
     renderFound();
-    showStep(firstRun ? 'welcome' : 'setup');
+    showStep(firstRun ? 'welcome' : 'details');
   }
 
   // ---------- actions ----------
-  $('#back').addEventListener('click', () => showStep('welcome'));
+  $('#back').addEventListener('click', () => showStep(step === 'details' ? 'choose' : 'welcome'));
   $('#cancel').addEventListener('click', () => api.close());
   $('#primary').addEventListener('click', async () => {
-    if (step === 'welcome') return showStep('setup');
+    if (step === 'welcome') return showStep('choose');
     if (step === 'done') return api.finish();
     $('#primary').disabled = true; $('#error').textContent = '';
     const r = await api.save({
       mode, serverUrl: $('#serverUrl').value,
       passphrase: mode === 'host' ? $('#pass').value : $('#joinPass').value,
       ttlHours: Number($('#ttl').value), maxMB: Number($('#max').value), port: Number($('#port').value),
-      notifications: $('#notifications').checked, launchAtLogin: $('#launchAtLogin').checked,
+      notifications: $('#notifications').checked, launchAtLogin: firstRun ? $('#doneLaunch').checked : $('#launchAtLogin').checked,
     });
     $('#primary').disabled = false;
     if (!r.ok) { $('#error').textContent = r.error; fit(); return; }
     $('#pass').value = ''; $('#joinPass').value = '';
     if (r.hostUrls) showUrls(r.hostUrls);
     if (firstRun) {
-      if (mode === 'host') { $('#doneSub').textContent = 'You are hosting a chute. It runs in the background while this computer is on.'; }
+      if (mode === 'host') $('#doneSub').textContent = 'You are hosting a chute. It runs in the background while this computer is on.';
       else { $('#doneSub').textContent = 'You are joined to the chute.'; $('#tip3').textContent = 'Send something to say hi'; $('#tip3sub').textContent = 'Everyone with the passphrase sees it within a few seconds.'; $('#doneUrls').hidden = true; }
       showStep('done');
     } else api.finish();
   });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT' && !$('#primary').hidden) { e.preventDefault(); $('#primary').click(); }
+  });
+  $('#doneLaunch').addEventListener('change', () => api.update({ launchAtLogin: $('#doneLaunch').checked }));
 
+  $('#lockBtn').addEventListener('click', async () => { await api.lockDevice(); api.close(); });
   $('#emptyBtn').addEventListener('click', async () => { if (await api.hostAction('empty')) $('#error').textContent = ''; });
   $('#stopBtn').addEventListener('click', async () => { if (await api.hostAction('stop')) location.reload(); });
   $('#leaveBtn').addEventListener('click', async () => { if (await api.hostAction('leave')) location.reload(); });

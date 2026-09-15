@@ -37,6 +37,9 @@
   .hero.big h1 { font-size: 26px; margin-top: 18px; }
   .hero p { margin: 0; color: var(--muted); font-size: 13px; }
   .hero.big p { font-size: 14px; }
+  html.compact .hero img { display: none; }
+  html.compact .hero { padding-bottom: 12px; }
+  html.compact .hero h1 { margin-top: 0; }
 
   /* welcome features */
   .features { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 6px; }
@@ -115,6 +118,37 @@
   .error { color: var(--danger); font-size: 12.5px; }
   .center { text-align: center; }
 
+  /* progress dots */
+  .titlebar { position: relative; }
+  .dots { position: absolute; left: 0; right: 0; top: 15px; display: flex; justify-content: center; align-items: center; gap: 7px; height: 8px; -webkit-app-region: no-drag; }
+  html.win .dots { position: static; padding-top: 12px; }
+  .dots i { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); transition: background .2s, transform .2s; }
+  .dots i.done { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .dots i.on { background: var(--accent); transform: scale(1.25); }
+  .dots[hidden] { display: none; }
+
+  /* choice cards */
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+  .choice { display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; padding: 16px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; cursor: pointer; font: inherit; color: var(--text); box-shadow: var(--shadow); transition: border-color .12s, transform .12s, background .12s; }
+  .choice:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .choice:active { transform: scale(.99); }
+  .choice .ci { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; }
+  .choice .ci svg { width: 22px; height: 22px; }
+  .choice .ci.host { background: linear-gradient(135deg, #3478f6, #6a5cff); } .choice .ci.join { background: linear-gradient(135deg, #34c759, #00b3a4); }
+  .choice strong { display: block; font-size: 14.5px; margin-bottom: 2px; }
+  .choice span { color: var(--muted); font-size: 12.5px; }
+  .choice .chev { margin-left: auto; color: var(--muted); flex: 0 0 auto; }
+  .choice .chev svg { width: 16px; height: 16px; }
+  .choice .grow { flex: 1; min-width: 0; }
+
+  /* disclosure */
+  details.adv { margin: -6px 0 14px; }
+  details.adv summary { list-style: none; cursor: pointer; color: var(--accent); font-size: 12.5px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px; user-select: none; }
+  details.adv summary::-webkit-details-marker { display: none; }
+  details.adv summary::before { content: "▸"; font-size: 10px; transition: transform .15s; }
+  details.adv[open] summary::before { transform: rotate(90deg); }
+  details.adv .group { margin-top: 8px; }
+
   /* done step */
   .next { display: flex; flex-direction: column; gap: 0; }
   .next .row .num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
@@ -122,7 +156,7 @@
 </style>
 </head>
 <body>
-  <div class="titlebar"></div>
+  <div class="titlebar"><div class="dots" id="dots" hidden><i></i><i></i><i></i><i></i></div></div>
   <main><div class="content">
 
     <!-- STEP: welcome (first run only) -->
@@ -139,20 +173,26 @@
       </div>
     </section>
 
-    <!-- STEP: setup -->
-    <section class="step" id="stepSetup" hidden>
+    <!-- STEP: choose -->
+    <section class="step" id="stepChoose" hidden>
       <div class="hero">
         <img src="icons/icon-256.png" alt="">
-        <h1 id="setupTitle">Set up your chute</h1>
-        <p id="setupSub">One person hosts it. Everyone else joins with the passphrase.</p>
+        <h1>Host or join?</h1>
+        <p>One person hosts the chute. Everyone else joins it with the passphrase.</p>
       </div>
-
-      <div class="seg" id="seg">
-        <div class="thumb"></div>
-        <button type="button" id="segConnect" class="on">Join a chute</button>
-        <button type="button" id="segHost">Host a chute</button>
+      <div class="choices">
+        <button class="choice" type="button" id="chooseHost"><div class="ci host" data-icon="home"></div><div class="grow"><strong>Host a chute</strong><span>This computer keeps the chute running for everyone, as long as it's on.</span></div><div class="chev" data-icon="chev"></div></button>
+        <button class="choice" type="button" id="chooseJoin"><div class="ci join" data-icon="people"></div><div class="grow"><strong>Join a chute</strong><span>Someone on your network is already hosting one.</span></div><div class="chev" data-icon="chev"></div></button>
       </div>
+    </section>
 
+    <!-- STEP: join -->
+    <section class="step" id="stepJoin" hidden>
+      <div class="hero">
+        <img src="icons/icon-256.png" alt="">
+        <h1 id="joinTitle">Join a chute</h1>
+        <p id="joinSub">Pick the computer that's hosting it and enter the passphrase.</p>
+      </div>
       <div class="panel" id="panelConnect">
         <div class="section-title">On your network</div>
         <div class="group" id="hostList"></div>
@@ -172,7 +212,16 @@
         </div>
       </div>
 
-      <div class="panel" id="panelHost" hidden>
+    </section>
+
+    <!-- STEP: host -->
+    <section class="step" id="stepHost" hidden>
+      <div class="hero">
+        <img src="icons/icon-256.png" alt="">
+        <h1 id="hostTitle">Host a chute</h1>
+        <p id="hostSub">Choose a passphrase. Your teammates will use it to join.</p>
+      </div>
+      <div class="panel" id="panelHost">
         <div class="section-title">Passphrase</div>
         <div class="group">
           <div class="field-row">
@@ -199,11 +248,15 @@
               <option value="1024">1 GB</option><option value="2048">2 GB</option>
             </select>
           </div>
-          <div class="row">
-            <div class="grow"><div class="label">Port</div><div class="sub">Only change this if another app uses it</div></div>
-            <input class="field mini" type="text" inputmode="numeric" pattern="[0-9]*" id="port" value="8443" maxlength="5">
-          </div>
         </div>
+        <details class="adv"><summary>Advanced</summary>
+          <div class="group">
+            <div class="row">
+              <div class="grow"><div class="label">Port</div><div class="sub">Only change this if another app uses it</div></div>
+              <input class="field mini" type="text" inputmode="numeric" pattern="[0-9]*" id="port" value="8443" maxlength="5">
+            </div>
+          </div>
+        </details>
         <div id="hostUrls" hidden>
           <div class="section-title">Your address</div>
           <div class="group">
@@ -215,12 +268,19 @@
         </div>
       </div>
 
+    </section>
+
+    <!-- settings-only extras, moved into the active step when not onboarding -->
+    <div id="extras" hidden>
       <div class="section-title">Behaviour</div>
       <div class="group">
         <label class="row"><div class="grow"><div class="label">Notify me when something arrives</div></div><input type="checkbox" class="switch" id="notifications" checked></label>
         <label class="row"><div class="grow"><div class="label">Launch at login</div><div class="sub" id="loginHint" hidden>Available in the installed app</div></div><input type="checkbox" class="switch" id="launchAtLogin"></label>
       </div>
-
+      <div class="section-title">This device</div>
+      <div class="group">
+        <div class="row"><div class="grow"><div class="label">Lock this device</div><div class="sub">Forgets the passphrase here until you type it again. The chute keeps running.</div></div><button class="btn" type="button" id="lockBtn">Lock</button></div>
+      </div>
       <div id="dangerHost" hidden>
         <div class="section-title">This chute</div>
         <div class="group">
@@ -234,7 +294,7 @@
           <div class="row"><div class="grow"><div class="label">Leave this chute</div><div class="sub">Forgets the address and passphrase on this device. Nothing is deleted for others.</div></div><button class="btn danger" type="button" id="leaveBtn">Leave…</button></div>
         </div>
       </div>
-    </section>
+    </div>
 
     <!-- STEP: done -->
     <section class="step" id="stepDone" hidden>
@@ -248,6 +308,9 @@
         <div class="row"><div class="num">1</div><div class="grow"><div class="label" id="tip1">Click the Chute icon in the menu bar to open it</div><div class="sub">It stays out of the way until you need it.</div></div></div>
         <div class="row"><div class="num">2</div><div class="grow"><div class="label" id="tip2">Drag a file onto the icon, or paste into the window</div><div class="sub">Text, screenshots, PDFs, anything. Press <span class="kbd">Esc</span> to close the window.</div></div></div>
         <div class="row"><div class="num">3</div><div class="grow"><div class="label" id="tip3">Tell your teammates the passphrase</div><div class="sub" id="tip3sub">They install Chute, pick this computer from the list, and type it once.</div></div></div>
+      </div>
+      <div class="group">
+        <label class="row"><div class="grow"><div class="label">Start Chute when I log in</div><div class="sub" id="doneLoginHint">So it's always in the menu bar.</div></div><input type="checkbox" class="switch" id="doneLaunch"></label>
       </div>
       <div id="doneUrls" hidden>
         <div class="section-title">Your address</div>
