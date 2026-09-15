@@ -127,6 +127,14 @@ electron-builder signs with the Developer ID it finds and submits the app to App
 minutes), then staples the ticket. The resulting DMG opens on any Mac without warnings.
 For Windows, a code-signing certificate can be supplied via `CSC_LINK` / `CSC_KEY_PASSWORD`.
 
+To confirm a build will pass Gatekeeper on other Macs, mount the DMG and run:
+
+```bash
+spctl -a -vv -t exec "/Volumes/Chute/Chute.app"
+```
+
+It should print `accepted` and `source=Notarized Developer ID`.
+
 ## Plain server: setup (once, on the machine that will host the chute)
 
 Requirements: Node.js 18+ and OpenSSL (already on macOS and Linux; on Windows
