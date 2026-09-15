@@ -66,6 +66,19 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 3px 9px 3px 7px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); white-space: nowrap; }
 .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .status.on i { background: var(--success); box-shadow: 0 0 0 3px rgba(52,199,89,.2); }
+.status.off { color: var(--danger); }
+.status.off i { background: var(--danger); box-shadow: 0 0 0 3px rgba(229,69,60,.2); animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+html.offline .items { opacity: .55; }
+html.offline .dropzone, html.offline .composer { opacity: .5; pointer-events: none; }
+.item.copyable { cursor: copy; }
+.item.draggable { cursor: grab; }
+.item.draggable:active { cursor: grabbing; }
+.toast { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 8px); background: var(--text); color: var(--bg); padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 500; opacity: 0; transition: opacity .18s, transform .18s; z-index: 60; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+html.desktop .toast { color: #fff; background: rgba(30,30,34,.92); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.drop-overlay small { display: block; font-size: 12.5px; font-weight: 400; color: var(--muted); margin-top: -2px; }
+#stopBtn:hover { color: var(--danger); }
 .top-right { display: flex; align-items: center; gap: 4px; }
 .icon-btn {
   width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
@@ -192,7 +205,7 @@ html.desktop .thumb-btn { width: 40px; height: 40px; }
 /* ---------- drag overlay ---------- */
 .drop-overlay {
   position: fixed; inset: 8px; z-index: 50; border-radius: var(--radius); pointer-events: none;
-  background: color-mix(in srgb, var(--accent) 12%, transparent); border: 2px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg)); border: 2px dashed var(--accent);
   display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; color: var(--accent);
   backdrop-filter: blur(2px);
 }

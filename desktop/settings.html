@@ -98,6 +98,11 @@
   .spinner { width: 14px; height: 14px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex: 0 0 auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .addr { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; color: var(--text); }
+  .sub.addr { color: var(--muted); }
+  .state { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .state.ok { background: rgba(52,199,89,.15); color: var(--success); }
+  .state.bad { background: var(--danger-soft); color: var(--danger); }
+  .state.pause { background: var(--seg); color: var(--muted); }
 
   /* switches */
   .switch { appearance: none; width: 40px; height: 24px; border-radius: 12px; background: var(--seg); border: 1px solid var(--border-strong); position: relative; cursor: pointer; margin: 0; transition: background .15s, border-color .15s; flex: 0 0 auto; }
@@ -193,6 +198,13 @@
         <h1 id="joinTitle">Join a chute</h1>
         <p id="joinSub">Pick the computer that's hosting it and enter the passphrase.</p>
       </div>
+      <div id="connJoin" hidden>
+        <div class="section-title">Connection</div>
+        <div class="group">
+          <div class="row"><div class="pc" data-icon="pc" style="width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center"></div><div class="grow"><div class="label" id="connHost"></div><div class="sub addr" id="connAddr"></div></div><span class="state" id="connState"></span></div>
+          <div class="row"><div class="grow"><div class="label">Host's settings</div><div class="sub" id="connLimits">Items expire after … · max … per item</div></div></div>
+        </div>
+      </div>
       <div class="panel" id="panelConnect">
         <div class="section-title">On your network</div>
         <div class="group" id="hostList"></div>
@@ -220,6 +232,12 @@
         <img src="icons/icon-256.png" alt="">
         <h1 id="hostTitle">Host a chute</h1>
         <p id="hostSub">Choose a passphrase. Your teammates will use it to join.</p>
+      </div>
+      <div id="connHostInfo" hidden>
+        <div class="section-title">Status</div>
+        <div class="group">
+          <div class="row"><div class="grow"><div class="label" id="hostStateLabel">Hosting</div><div class="sub" id="hostStateSub"></div></div><span class="state" id="hostState"></span></div>
+        </div>
       </div>
       <div class="panel" id="panelHost">
         <div class="section-title">Passphrase</div>
@@ -276,6 +294,7 @@
       <div class="group">
         <label class="row"><div class="grow"><div class="label">Notify me when something arrives</div></div><input type="checkbox" class="switch" id="notifications" checked></label>
         <label class="row"><div class="grow"><div class="label">Launch at login</div><div class="sub" id="loginHint" hidden>Available in the installed app</div></div><input type="checkbox" class="switch" id="launchAtLogin"></label>
+        <div class="row"><div class="grow"><div class="label">Save files to</div><div class="sub addr" id="downloadDir"></div></div><button class="btn" type="button" id="chooseDir">Choose…</button></div>
       </div>
       <div class="section-title">This device</div>
       <div class="group">
@@ -284,8 +303,10 @@
       <div id="dangerHost" hidden>
         <div class="section-title">This chute</div>
         <div class="group">
+          <div class="row" id="rowStop"><div class="grow"><div class="label">Stop hosting</div><div class="sub">Takes the chute off the network. You choose whether to keep the items.</div></div><button class="btn" type="button" id="stopBtn">Stop…</button></div>
+          <div class="row" id="rowResume" hidden><div class="grow"><div class="label">Start hosting again</div><div class="sub">Puts the chute back on the network with the same passphrase.</div></div><button class="btn primary" type="button" id="resumeBtn">Start</button></div>
           <div class="row"><div class="grow"><div class="label">Empty the chute</div><div class="sub">Deletes everything in it now. Keeps hosting.</div></div><button class="btn danger" type="button" id="emptyBtn">Empty…</button></div>
-          <div class="row"><div class="grow"><div class="label">Stop hosting</div><div class="sub">Takes the chute off the network and deletes everything in it.</div></div><button class="btn danger" type="button" id="stopBtn">Stop…</button></div>
+          <div class="row"><div class="grow"><div class="label">Delete this chute</div><div class="sub">Stops hosting, deletes everything, forgets the passphrase.</div></div><button class="btn danger" type="button" id="deleteBtn">Delete…</button></div>
         </div>
       </div>
       <div id="dangerJoin" hidden>

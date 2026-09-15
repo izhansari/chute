@@ -37,10 +37,15 @@ let quitting = false;
 let unread = 0;
 let nativeDialogOpen = false;
 let pendingPassphrase = null; // handed to the page once after setup so it doesn't ask again
+let certDialogOpen = false;
+let serverInfo = null;        // { ttlHours, maxMB } reported by the page after unlocking
+let connState = 'unknown';    // 'online' | 'offline' | 'locked' reported by the page
+let trayDragHideTimer = null;
+const staged = new Map();     // item id -> { path, icon } files staged on disk for drag-out
 
 // ---------- settings ----------
 function loadSettings() {
-  const defaults = { mode: null, serverUrl: '', launchAtLogin: false, notifications: true, pinned: false, pins: {} };
+  const defaults = { mode: null, serverUrl: '', launchAtLogin: false, notifications: true, pinned: false, pins: {}, downloadDir: '', hostPaused: false };
   try { return Object.assign(defaults, JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'))); } catch { return defaults; }
 }
 function saveSettings() { fs.mkdirSync(USER_DATA, { recursive: true }); fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2)); }
@@ -54,7 +59,9 @@ function normalizeUrl(input) {
   u.pathname = '/'; u.search = ''; u.hash = '';
   return u.toString();
 }
+const PAUSED_URL = require('url').pathToFileURL(path.join(__dirname, 'paused.html')).href;
 function targetUrl() {
+  if (settings.mode === 'host' && settings.hostPaused) return PAUSED_URL;
   if (settings.mode === 'host' && drop) return `http://127.0.0.1:${drop.localPort}/`;
   if (settings.mode === 'connect' && settings.serverUrl) return settings.serverUrl;
   return null;
@@ -118,12 +125,17 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
     return callback(true);
   }
   callback(false);
+  if (certDialogOpen) return; // background polls hit this every few seconds; one dialog is enough
+  certDialogOpen = true;
   dialog.showMessageBox({
-    type: 'warning', buttons: ['Cancel', 'Trust the new certificate'], defaultId: 0, cancelId: 0,
-    title: 'Certificate changed',
-    message: `The certificate for ${host} is different from the one remembered.`,
-    detail: 'This happens if the host re-ran setup or reinstalled. If you did not expect this, do not continue.',
-  }).then(({ response }) => { if (response === 1) { settings.pins[host] = fp; saveSettings(); if (win) win.loadURL(url); } });
+    type: 'warning', buttons: ['Cancel', 'Trust the new certificate'], defaultId: 1, cancelId: 0,
+    title: 'The host has a new certificate',
+    message: `${host} is presenting a different certificate than before.`,
+    detail: 'This is normal if the host set up a new chute or reinstalled Chute. If you did not expect it, cancel.',
+  }).then(({ response }) => {
+    certDialogOpen = false;
+    if (response === 1) { settings.pins[host] = fp; saveSettings(); if (win) win.loadURL(targetUrl()); }
+  });
 });
 
 // ---------- popover window ----------
@@ -153,6 +165,7 @@ function createMainWindow() {
     }, 120);
   });
   win.on('show', () => { clearUnread(); win.webContents.send('shown'); });
+  win.webContents.on('did-finish-load', () => { if (settings.hostPaused && win.webContents.getURL() === PAUSED_URL) return; });
   win.on('focus', () => clearUnread());
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { const t = targetUrl(); if (!t || !url.startsWith(t)) e.preventDefault(); });
@@ -271,7 +284,7 @@ function trayIcon(badge = false) {
   return nativeImage.createFromPath(path.join(ICONS, badge ? 'tray-badge-16.png' : 'tray-16.png'));
 }
 function buildTrayMenu() {
-  const hosting = settings.mode === 'host' && drop;
+  const hosting = settings.mode === 'host' && drop && !settings.hostPaused;
   const urls = hosting ? drop.urls() : null;
   return Menu.buildFromTemplate([
     { label: 'Open Chute', click: showMain },
@@ -281,11 +294,16 @@ function buildTrayMenu() {
     ...(hosting ? [
       { label: 'Hosting at ' + urls.lan[0], enabled: false },
       { label: 'Copy address for teammates', click: () => { clipboard.writeText(urls.lan.join('\n')); notify('Address copied', urls.lan[0]); } },
+      { label: (drop.stats().connectedDevices || 0) + ' device' + (drop.stats().connectedDevices === 1 ? '' : 's') + ' connected', enabled: false },
       { label: 'Empty the chute…', click: async () => { if (await confirm(null, 'Empty the chute?', 'Everything in it is deleted for everyone. The chute keeps running.', 'Empty')) await emptyChute(); } },
-      { label: 'Stop hosting…', click: async () => { if (await confirm(null, 'Stop hosting this chute?', 'It goes off the network and everything in it is deleted. Teammates will no longer be able to connect.', 'Stop hosting')) { await stopHosting(); openSettings(); } } },
+      { label: 'Stop hosting…', click: () => stopHostingDialog(null) },
+      { type: 'separator' },
+    ] : settings.mode === 'host' && settings.hostPaused ? [
+      { label: 'Hosting is paused', enabled: false },
+      { label: 'Start hosting again', click: resumeHosting },
       { type: 'separator' },
     ] : settings.mode === 'connect' ? [
-      { label: 'Joined ' + settings.serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''), enabled: false },
+      { label: (connState === 'offline' ? 'Host offline · ' : 'Joined ') + settings.serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''), enabled: false },
       { label: 'Leave this chute…', click: async () => { if (await confirm(null, 'Leave this chute?', 'This device forgets the address and passphrase. Nothing is deleted for anyone else.', 'Leave')) { await leaveChute(); openSettings(); } } },
       { type: 'separator' },
     ] : []),
@@ -304,8 +322,19 @@ function createTray() {
   tray.on('click', toggleMain);
   tray.on('right-click', () => tray.popUpContextMenu(buildTrayMenu()));
   if (IS_MAC) {
-    tray.on('drop-files', (e, files) => sendPaths(files));
-    tray.on('drop-text', (e, text) => pushToPage('drop-text', text));
+    tray.on('drop-files', (e, files) => { clearTimeout(trayDragHideTimer); sendPaths(files); });
+    tray.on('drop-text', (e, text) => { clearTimeout(trayDragHideTimer); pushToPage('drop-text', text); });
+    tray.on('drag-enter', () => {
+      clearTimeout(trayDragHideTimer);
+      if (!ensureLoaded()) return;
+      if (!win.isVisible()) { positionNearTray(); win.showInactive(); }
+      win.webContents.send('tray-drag', true);
+    });
+    tray.on('drag-leave', () => {
+      // give the user a moment to carry the drag down into the window; hide if they wander off
+      trayDragHideTimer = setTimeout(() => { if (win && win.isVisible() && !win.isFocused() && !settings.pinned) { win.webContents.send('tray-drag', false); win.hide(); } }, 1200);
+    });
+    tray.on('drag-end', () => { clearTimeout(trayDragHideTimer); if (win) win.webContents.send('tray-drag', false); });
   }
   if (!IS_MAC) tray.setContextMenu(buildTrayMenu());
   return () => { if (!IS_MAC) tray.setContextMenu(buildTrayMenu()); };
@@ -355,7 +384,38 @@ async function quickLook(name, bytes) {
   return !err;
 }
 
+// ---------- drag-out: stage decrypted files on disk so the OS can drag them ----------
+const STAGE_DIR = path.join(USER_DATA, 'stage');
+async function stageFile(id, name, bytes) {
+  if (!/^[a-f0-9]{16}$/.test(String(id)) || !bytes) return null;
+  const existing = staged.get(id);
+  if (existing && fs.existsSync(existing.path)) return existing.path;
+  const dir = path.join(STAGE_DIR, id);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, safeName(name));
+  fs.writeFileSync(file, Buffer.from(bytes), { mode: 0o600 });
+  let icon = null;
+  try { icon = await app.getFileIcon(file, { size: 'normal' }); } catch { /* ignore */ }
+  staged.set(id, { path: file, icon });
+  return file;
+}
+function unstage(ids) {
+  for (const id of ids) { const st = staged.get(id); if (st) { cleanDir(path.dirname(st.path)); staged.delete(id); } }
+}
+
 // ---------- IPC (page bridge) ----------
+ipcMain.handle('stage', (e, f) => stageFile(f && f.id, f && f.name, f && f.bytes));
+ipcMain.on('start-drag', (e, id) => {
+  const st = staged.get(String(id));
+  if (!st || !win) return;
+  win.webContents.startDrag({ file: st.path, icon: st.icon || nativeImage.createFromPath(path.join(ICONS, 'icon-256.png')).resize({ width: 64 }) });
+});
+ipcMain.on('unstage', (e, ids) => { if (Array.isArray(ids)) unstage(ids.map(String)); });
+ipcMain.on('server-info', (e, info) => { if (info && typeof info === 'object') serverInfo = { ttlHours: Number(info.ttlHours) || null, maxMB: Number(info.maxMB) || null }; });
+ipcMain.on('conn-state', (e, st) => { const v = String(st); if (v !== connState) { connState = v; refreshTray(); } });
+ipcMain.on('drag-in-window', (e, on) => { if (on) clearTimeout(trayDragHideTimer); });
+ipcMain.on('stop-hosting', () => stopHostingDialog(win));
+ipcMain.on('resume-hosting', () => resumeHosting());
 ipcMain.on('notify', (e, payload) => {
   if (!payload || typeof payload !== 'object') return;
   if (win && win.isVisible() && win.isFocused()) return;
@@ -369,7 +429,7 @@ ipcMain.on('choose-files', () => chooseFilesDialog());
 ipcMain.handle('toggle-pinned', () => { settings.pinned = !settings.pinned; saveSettings(); return settings.pinned; });
 ipcMain.handle('thumbnail', (e, f) => thumbnailFor(f && f.name, f && f.bytes));
 ipcMain.handle('quick-look', (e, f) => quickLook(f && f.name, f && f.bytes));
-ipcMain.handle('app-info', () => ({ platform: process.platform, version: app.getVersion(), mode: settings.mode, pinned: settings.pinned }));
+ipcMain.handle('app-info', () => ({ platform: process.platform, version: app.getVersion(), mode: settings.mode, pinned: settings.pinned, hostPaused: !!settings.hostPaused }));
 ipcMain.handle('take-passphrase', () => { const p = pendingPassphrase; pendingPassphrase = null; return p; });
 
 // ---------- IPC (settings window) ----------
@@ -381,7 +441,18 @@ ipcMain.handle('settings:get', () => {
     host: cfg ? { port: cfg.port, ttlHours: cfg.ttlHours, maxMB: cfg.maxMB } : { port: 8443, ttlHours: 24, maxMB: 512 },
     hostUrls: drop ? drop.urls() : null, hostname: os.hostname().split('.')[0], canLoginItem: app.isPackaged,
     firstRun: !settings.mode,
+    hostPaused: !!settings.hostPaused,
+    connectedDevices: drop ? drop.stats().connectedDevices : 0,
+    connState, serverInfo,
+    downloadDir: settings.downloadDir || app.getPath('downloads'),
+    pinnedHost: settings.mode === 'connect' ? settings.serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : null,
   };
+});
+ipcMain.handle('settings:choose-dir', async () => {
+  const r = await dialog.showOpenDialog(settingsWin || undefined, { properties: ['openDirectory', 'createDirectory'], defaultPath: settings.downloadDir || app.getPath('downloads'), message: 'Where should Chute save files?' });
+  if (r.canceled || !r.filePaths[0]) return settings.downloadDir || app.getPath('downloads');
+  settings.downloadDir = r.filePaths[0]; saveSettings();
+  return settings.downloadDir;
 });
 ipcMain.handle('settings:save', async (e, s) => {
   try {
@@ -403,7 +474,7 @@ ipcMain.handle('settings:save', async (e, s) => {
         Object.assign(existing, { port: Number(s.port || existing.port), ttlHours: Number(s.ttlHours || existing.ttlHours), maxMB: Number(s.maxMB || existing.maxMB) });
         fs.writeFileSync(path.join(HOST_DIR, 'config.json'), JSON.stringify(existing, null, 2) + '\n');
       } else throw new Error('Choose a passphrase to host the chute.');
-      settings.mode = 'host';
+      settings.mode = 'host'; settings.hostPaused = false;
       await startHost();
     } else throw new Error('Pick a mode.');
     saveSettings();
@@ -438,10 +509,33 @@ async function emptyChute() {
   const dir = path.join(HOST_DIR, 'data');
   try { for (const f of fs.readdirSync(dir)) fs.unlinkSync(path.join(dir, f)); } catch { /* ignore */ }
 }
-async function stopHosting() {
+// Stop hosting: one dialog, keep or delete the items. The chute stays configured so it can be resumed.
+async function stopHostingDialog(parent) {
+  const { response } = await dialog.showMessageBox(parent || undefined, {
+    type: 'question', buttons: ['Cancel', 'Keep items', 'Delete everything'], defaultId: 1, cancelId: 0,
+    message: 'Stop hosting this chute?',
+    detail: 'It goes off the network and teammates can no longer see it. You can start hosting again any time from the menu bar.\n\nKeep the items for when you resume, or delete everything now?',
+  });
+  if (response === 0) return false;
+  if (response === 2) await emptyChute();
+  await stopHost();
+  settings.hostPaused = true; saveSettings();
+  if (win) win.loadURL(targetUrl());
+  refreshTray();
+  return true;
+}
+async function resumeHosting() {
+  try { await startHost(); settings.hostPaused = false; saveSettings(); }
+  catch (e) { notify('Could not start hosting', e.message); return false; }
+  if (win) win.loadURL(targetUrl());
+  refreshTray();
+  return true;
+}
+// Forget this chute entirely: server off, config + items gone, back to onboarding.
+async function deleteChute() {
   await stopHost();
   cleanDir(HOST_DIR);
-  settings.mode = null; saveSettings();
+  settings.mode = null; settings.hostPaused = false; saveSettings();
   await forgetPageState();
   if (win) { win.hide(); win.loadURL('about:blank'); }
   refreshTray();
@@ -457,9 +551,11 @@ ipcMain.handle('settings:host-action', async (e, what) => {
     if (!await confirm(settingsWin, 'Empty the chute?', 'Everything in it is deleted for everyone. The chute keeps running.', 'Empty')) return false;
     await emptyChute(); return true;
   }
-  if (what === 'stop') {
-    if (!await confirm(settingsWin, 'Stop hosting this chute?', 'It goes off the network and everything in it is deleted. Teammates will no longer be able to connect.', 'Stop hosting')) return false;
-    await stopHosting(); return true;
+  if (what === 'stop') return stopHostingDialog(settingsWin);
+  if (what === 'resume') return resumeHosting();
+  if (what === 'delete') {
+    if (!await confirm(settingsWin, 'Delete this chute?', 'Stops hosting, deletes everything in it, and forgets the passphrase. You start over from scratch.', 'Delete chute')) return false;
+    await deleteChute(); return true;
   }
   if (what === 'leave') {
     if (!await confirm(settingsWin, 'Leave this chute?', 'This device forgets the address and passphrase. Nothing is deleted for anyone else.', 'Leave')) return false;
@@ -479,14 +575,15 @@ ipcMain.on('settings:resize', (e, h) => {
 // Downloads go straight to ~/Downloads with a notification instead of a save dialog.
 function wireDownloads() {
   session.defaultSession.on('will-download', (e, item) => {
-    const dir = app.getPath('downloads');
+    let dir = settings.downloadDir || app.getPath('downloads');
+    try { fs.mkdirSync(dir, { recursive: true }); } catch { dir = app.getPath('downloads'); }
     const name = item.getFilename() || 'file';
     let target = path.join(dir, name);
     let n = 1;
     while (fs.existsSync(target)) { const ext = path.extname(name); target = path.join(dir, `${path.basename(name, ext)} (${n++})${ext}`); }
     item.setSavePath(target);
     item.once('done', (ev, s) => {
-      if (s === 'completed') notify('Saved to Downloads', path.basename(target), () => shell.showItemInFolder(target));
+      if (s === 'completed') notify('Saved to ' + path.basename(dir), path.basename(target), () => shell.showItemInFolder(target));
       else notify('Download failed', path.basename(target));
     });
   });
@@ -505,9 +602,10 @@ app.whenReady().then(async () => {
   applyLoginItem();
   if (SELF_TEST) return runSelfTest();
 
-  if (settings.mode === 'host') {
-    try { await startHost(); } catch (e) { notify('Could not start the chute', e.message); settings.mode = null; }
+  if (settings.mode === 'host' && !settings.hostPaused) {
+    try { await startHost(); } catch (e) { notify('Could not start the chute', e.message); settings.hostPaused = true; saveSettings(); }
   }
+  cleanDir(STAGE_DIR);
   refreshTray();
   const hidden = process.argv.includes('--hidden') || (app.getLoginItemSettings().wasOpenedAsHidden);
   if (!settings.mode) openSettings();
@@ -515,7 +613,7 @@ app.whenReady().then(async () => {
   else ensureLoaded(); // load in the background so notifications work
 });
 app.on('window-all-closed', () => { /* stay in the tray */ });
-app.on('before-quit', () => { quitting = true; cleanDir(PREVIEW_DIR); stopHost(); if (bonjour) { try { bonjour.destroy(); } catch { /* ignore */ } } });
+app.on('before-quit', () => { quitting = true; cleanDir(PREVIEW_DIR); cleanDir(STAGE_DIR); stopHost(); if (bonjour) { try { bonjour.destroy(); } catch { /* ignore */ } } });
 app.on('activate', () => showMain());
 
 // ---------- self test (development): host mode, screenshots, native drops, quits ----------
@@ -604,6 +702,24 @@ async function runSelfTest() {
     await wait(3000); // fresh state clears ~2.5s after the window is shown
     results.badgeAfterShown = unread;
     results.freshAfterShown = await win.webContents.executeJavaScript('document.querySelectorAll(".item.fresh").length');
+    // drag-out staging: the page stages a file on mousedown; check it lands on disk with the right name
+    await win.webContents.executeJavaScript('(() => { const li = [...document.querySelectorAll(".item")].find(l => l.textContent.includes("Q3 roadmap.pdf")); li.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); return true; })()');
+    await wait(1500);
+    results.stagedFiles = [...staged.values()].map((v) => path.basename(v.path));
+    // click-to-copy on a text item
+    await win.webContents.executeJavaScript('(() => { const li = [...document.querySelectorAll(".item")].find(l => l.textContent.includes("Standup moved")); li.querySelector(".item-main").click(); return true; })()');
+    await wait(800);
+    results.clipboardAfterClick = clipboard.readText().slice(0, 40);
+    // pause / resume hosting
+    await stopHost(); settings.hostPaused = true; saveSettings(); win.loadURL(targetUrl());
+    await new Promise((r) => win.webContents.once('did-finish-load', r));
+    await wait(500);
+    fs.writeFileSync(path.join(out, 'paused.png'), (await win.webContents.capturePage()).toPNG());
+    results.pausedPage = win.webContents.getURL().endsWith('paused.html');
+    results.resumed = await resumeHosting();
+    await new Promise((r) => win.webContents.once('did-finish-load', r));
+    await wait(4000);
+    results.itemsAfterResume = await win.webContents.executeJavaScript('document.querySelectorAll(".item").length');
     results.ok = true;
   } catch (e) { results.ok = false; results.error = e.stack || String(e); }
   fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(results, null, 2));

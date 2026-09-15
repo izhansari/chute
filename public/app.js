@@ -29,6 +29,7 @@
     media: '<circle cx="12" cy="12" r="8.5"/><path d="M10 9l5 3-5 3z"/>',
     inbox: '<path d="M4 13l2.5-8h11L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/><path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    power: '<path d="M12 3v9M18.4 6.6a9 9 0 1 1-12.8 0"/>',
   };
   function svg(name, cls = '') {
     const t = document.createElement('template');
@@ -40,14 +41,15 @@
   const el = {
     insecure: $('#insecure'), gate: $('#gate'), gateForm: $('#gateForm'), pass: $('#passInput'), remember: $('#rememberBox'),
     unlockBtn: $('#unlockBtn'), gateError: $('#gateError'), gateIcon: $('#gateIcon'),
-    app: $('#app'), status: $('#status'), statusText: $('#statusText'), lockBtn: $('#lockBtn'), pinBtn: $('#pinBtn'), settingsBtn: $('#settingsBtn'), closeBtn: $('#closeBtn'),
+    app: $('#app'), status: $('#status'), statusText: $('#statusText'), lockBtn: $('#lockBtn'), pinBtn: $('#pinBtn'), settingsBtn: $('#settingsBtn'), closeBtn: $('#closeBtn'), stopBtn: $('#stopBtn'),
+    toast: $('#toast'),
     dropzone: $('#dropzone'), dzIcon: $('#dzIcon'), chooseBtn: $('#chooseBtn'), fileInput: $('#fileInput'),
     textForm: $('#textForm'), textInput: $('#textInput'), sendBtn: $('#sendBtn'), uploads: $('#uploads'),
     items: $('#items'), empty: $('#empty'), emptyArt: $('#emptyArt'), listInfo: $('#listInfo'),
     overlay: $('#dropOverlay'), overlayIcon: $('#overlayIcon'),
   };
   setIcon(el.gateIcon, 'key'); setIcon(el.dzIcon, 'chute'); setIcon(el.sendBtn, 'send'); setIcon(el.emptyArt, 'inbox'); setIcon(el.overlayIcon, 'chute');
-  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear'); setIcon(el.closeBtn, 'close');
+  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear'); setIcon(el.closeBtn, 'close'); setIcon(el.stopBtn, 'power');
 
   const state = {
     token: null, key: null, server: null, clockOffset: 0,
@@ -58,7 +60,16 @@
     fresh: new Set(),       // ids that arrived from elsewhere and haven't been looked at yet
     animated: new Set(),    // ids already shown once (so re-renders don't replay the entrance animation)
     info: null,
+    offline: false, failStreak: 0,
+    staged: new Map(),      // id -> Promise<path | blobUrl> for drag-out
+    textCache: new Map(),   // id -> full text
   };
+  let toastTimer = null;
+  function toast(msg) {
+    el.toast.textContent = msg; el.toast.hidden = false; el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.toast.classList.remove('show'); setTimeout(() => { el.toast.hidden = true; }, 200); }, 1400);
+  }
 
   // ---------- crypto ----------
   const hexToBytes = (h) => Uint8Array.from(h.match(/../g), (x) => parseInt(x, 16));
@@ -92,9 +103,19 @@
     const headers = Object.assign({}, opts.headers || {});
     if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
     const res = await fetch(path, Object.assign({}, opts, { headers, cache: 'no-store' }));
-    if (res.status === 401) { lock('Wrong passphrase.'); throw new Error('unauthorized'); }
+    if (res.status === 401) { lock(state.known ? 'The host set up a new chute. Enter its passphrase.' : 'Wrong passphrase.'); throw new Error('unauthorized'); }
     if (res.status === 429) throw new Error('Too many failed attempts. Wait 10 minutes.');
     return res;
+  }
+  function setOffline(off) {
+    if (state.offline === off) return;
+    state.offline = off;
+    el.status.classList.toggle('on', !off && !!state.token);
+    el.status.classList.toggle('off', off);
+    el.statusText.textContent = off ? 'Host offline' : (desktop ? (state.info && state.info.mode === 'host' ? 'Hosting' : 'Connected') : location.host);
+    el.status.title = off ? 'Can\'t reach the host. Items shown may be stale; the app keeps trying.' : el.status.title;
+    document.documentElement.classList.toggle('offline', off);
+    if (desktop) desktop.connState(off ? 'offline' : 'online');
   }
   function uploadXHR(bytes, metaB64, onProgress) {
     return new Promise((resolve, reject) => {
@@ -136,6 +157,7 @@
         if (remember) localStorage.setItem('chutePass', pass); else localStorage.removeItem('chutePass');
       } catch { /* storage unavailable */ }
       showApp();
+      if (desktop) desktop.serverInfo(state.server);
       await applyList(await r.json());
       startPolling();
     } catch (e) {
@@ -147,6 +169,8 @@
   }
   function lock(msg) {
     stopPolling();
+    setOffline(false);
+    if (desktop) desktop.connState('locked');
     state.token = null; state.key = null; state.items = []; state.metaCache.clear(); state.expanded.clear(); state.known = null; state.fresh.clear();
     for (const u of state.imageUrls.values()) URL.revokeObjectURL(u);
     state.imageUrls.clear();
@@ -161,6 +185,7 @@
     el.gate.hidden = true; el.app.hidden = false; el.lockBtn.hidden = !!desktop;
     el.status.classList.add('on');
     el.statusText.textContent = desktop ? (state.info && state.info.mode === 'host' ? 'Hosting' : 'Connected') : location.host;
+    if (desktop) { desktop.connState('online'); el.stopBtn.hidden = !(state.info && state.info.mode === 'host'); }
     el.status.title = `Items expire after ${state.server.ttlHours}h · max ${state.server.maxMB} MB each`;
   }
 
@@ -182,8 +207,11 @@
     if (!state.token) return;
     try {
       const r = await api('/api/items');
-      if (r.ok) await applyList(await r.json());
-    } catch { /* offline; next tick */ }
+      if (r.ok) { state.failStreak = 0; setOffline(false); await applyList(await r.json()); }
+    } catch (e) {
+      if (e && e.message === 'unauthorized') return;
+      if (++state.failStreak >= 2) setOffline(true); // two missed polls (~8s) = host is gone
+    }
   }
 
   async function applyList(data) {
@@ -193,6 +221,9 @@
     for (const id of [...state.metaCache.keys()]) if (!live.has(id)) state.metaCache.delete(id);
     for (const id of [...state.fresh]) if (!live.has(id)) state.fresh.delete(id);
     for (const id of [...state.animated]) if (!live.has(id)) state.animated.delete(id);
+    const gone = [...state.staged.keys()].filter((id) => !live.has(id));
+    for (const id of gone) { state.staged.delete(id); state.textCache.delete(id); }
+    if (gone.length && desktop) desktop.unstage(gone);
     for (const [id, url] of [...state.imageUrls]) if (!live.has(id)) { URL.revokeObjectURL(url); state.imageUrls.delete(id); }
     await Promise.all(state.items.map(async (it) => {
       if (state.metaCache.has(it.id)) return;
@@ -311,14 +342,20 @@
       const icon = meta.thumb
         ? h('button', { class: 'thumb-btn', type: 'button', title: canPeek ? 'Preview' : meta.name, onclick: () => { if (canPeek) peek(it, meta); } }, h('img', { class: 'thumb', src: meta.thumb, alt: '' }))
         : h('div', { class: 'tile ' + kind }, svg(kind));
-      const li = h('li', { class: 'item' + (fresh ? ' fresh' : '') + (enter ? ' enter' : ''), 'data-id': it.id, onanimationend: (e) => e.currentTarget.classList.remove('enter') },
+      const li = h('li', { class: 'item' + (fresh ? ' fresh' : '') + (enter ? ' enter' : '') + (isText ? ' copyable' : ' draggable'), 'data-id': it.id, draggable: 'true',
+        title: isText ? 'Click to copy · drag to move the text elsewhere' : 'Drag out to save it anywhere',
+        onanimationend: (e) => e.currentTarget.classList.remove('enter'),
+        onmousedown: (e) => { if (!e.target.closest('button')) prepareDrag(it, meta); },
+        ondragstart: (e) => onDragStart(e, it, meta),
+        onclick: (e) => { if (isText && !e.target.closest('button') && !e.target.closest('.item-preview.full')) copyText(it, null); },
+      },
         icon,
         h('div', { class: 'item-main' }, name, metaLine),
         actions);
 
       if (isText) {
         const full = expanded && state.fullText && state.fullText.id === it.id ? state.fullText.text : null;
-        const pre = h('div', { class: 'item-preview' + (full != null ? ' full' : (hasMore ? ' clamped' : '')), onclick: () => { if (full == null && hasMore) toggleExpand(it.id); } }, full != null ? full : (meta.preview || ''));
+        const pre = h('div', { class: 'item-preview' + (full != null ? ' full' : (hasMore ? ' clamped' : '')) }, full != null ? full : (meta.preview || ''));
         li.append(pre);
       }
       if (kind === 'image' && state.imageUrls.has(it.id)) li.append(h('img', { class: 'item-img', src: state.imageUrls.get(it.id), alt: meta.name }));
@@ -341,7 +378,48 @@
         document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
       }
       if (btn) { btn.replaceChildren(svg('check')); btn.style.color = 'var(--success)'; setTimeout(() => { btn.replaceChildren(svg('copy')); btn.style.color = ''; }, 1400); }
+      toast('Copied to clipboard');
     } catch (e) { alert('Could not copy: ' + e.message); }
+  }
+
+  // ---------- drag out ----------
+  async function fullText(it) {
+    if (state.textCache.has(it.id)) return state.textCache.get(it.id);
+    const t = td.decode(await fetchPlain(it));
+    state.textCache.set(it.id, t);
+    return t;
+  }
+  // Called on mousedown so the decrypted file is ready by the time the OS drag begins.
+  function prepareDrag(it, meta) {
+    if (meta.kind === 'text') { fullText(it).catch(() => {}); return; }
+    if (state.staged.has(it.id)) return;
+    const p = (async () => {
+      const buf = await fetchPlain(it);
+      if (desktop && desktop.stage) return desktop.stage({ id: it.id, name: meta.name, bytes: new Uint8Array(buf) });
+      return URL.createObjectURL(new Blob([buf], { type: meta.type || 'application/octet-stream' }));
+    })();
+    p.catch(() => state.staged.delete(it.id));
+    state.staged.set(it.id, p);
+  }
+  function onDragStart(e, it, meta) {
+    if (meta.kind === 'text') {
+      const t = state.textCache.get(it.id) || meta.preview || '';
+      e.dataTransfer.setData('text/plain', t);
+      e.dataTransfer.effectAllowed = 'copy';
+      return;
+    }
+    let ready = null;
+    const p = state.staged.get(it.id);
+    if (p) p.then((v) => { ready = v; });
+    if (desktop && desktop.startDrag) {
+      e.preventDefault(); // the OS drag is started by the desktop shell with the staged file
+      if (p) p.then(() => desktop.startDrag(it.id));
+      return;
+    }
+    // browser: Chrome's DownloadURL lets you drag a file out to the desktop if the blob is ready
+    if (ready && typeof ready === 'string' && ready.startsWith('blob:')) {
+      e.dataTransfer.setData('DownloadURL', `${meta.type || 'application/octet-stream'}:${meta.name}:${ready}`);
+    } else { e.preventDefault(); toast('Hold a moment, then drag again'); }
   }
   async function toggleExpand(id) {
     if (state.expanded.has(id)) { state.expanded.delete(id); state.fullText = null; return render(); }
@@ -473,7 +551,8 @@
 
   let dragDepth = 0;
   const setDragging = (on) => { document.body.classList.toggle('dragging', on); el.overlay.hidden = !on; };
-  document.addEventListener('dragenter', (e) => { e.preventDefault(); if (state.token && e.dataTransfer && [...e.dataTransfer.types].some((t) => t === 'Files' || t === 'text/plain')) { dragDepth++; setDragging(true); } });
+  const isExternalDrag = (e) => e.dataTransfer && [...e.dataTransfer.types].some((t) => t === 'Files' || t === 'text/plain') && !e.dataTransfer.types.includes('chute/internal');
+  document.addEventListener('dragenter', (e) => { e.preventDefault(); if (state.token && isExternalDrag(e)) { dragDepth++; setDragging(true); if (desktop) desktop.dragInWindow(true); } });
   document.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = state.token ? 'copy' : 'none'; });
   document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; setDragging(false); } });
   document.addEventListener('drop', (e) => {
@@ -506,11 +585,13 @@
     document.documentElement.classList.add('desktop', IS_MAC ? 'mac' : 'win');
     el.settingsBtn.hidden = false; el.pinBtn.hidden = false; el.closeBtn.hidden = false;
     el.closeBtn.addEventListener('click', () => desktop.hide());
+    el.stopBtn.addEventListener('click', () => desktop.stopHosting());
     desktop.onLock(() => lock());
+    desktop.onTrayDrag((on) => { if (state.token) setDragging(on); });
     const hint = document.getElementById('gateDesktopHint'); if (hint) hint.hidden = false;
     el.settingsBtn.addEventListener('click', () => desktop.openSettings());
     el.pinBtn.addEventListener('click', async () => { const pinned = await desktop.togglePinned(); el.pinBtn.classList.toggle('active', pinned); });
-    desktop.info().then((info) => { state.info = info; el.pinBtn.classList.toggle('active', !!info.pinned); if (state.token) showApp(); });
+    desktop.info().then((info) => { state.info = info; el.pinBtn.classList.toggle('active', !!info.pinned); el.stopBtn.hidden = info.mode !== 'host'; if (state.token) showApp(); });
     el.remember.checked = true;
     desktop.onDropFiles((files) => { if (state.token) sendFiles(files.map((f) => new File([f.bytes], f.name, { type: f.type || '' }))); });
     desktop.onDropText((text) => { if (state.token) sendText(text); });

@@ -19,4 +19,13 @@ contextBridge.exposeInMainWorld('chute', {
   onShown: (cb) => { ipcRenderer.on('shown', () => cb()); },
   onPinned: (cb) => { ipcRenderer.on('pinned', (_e, v) => cb(!!v)); },
   onLock: (cb) => { ipcRenderer.on('lock', () => cb()); },
+  onTrayDrag: (cb) => { ipcRenderer.on('tray-drag', (_e, on) => cb(!!on)); },
+  dragInWindow: (on) => ipcRenderer.send('drag-in-window', !!on),
+  stage: (f) => ipcRenderer.invoke('stage', { id: String(f.id), name: String(f.name || 'file'), bytes: f.bytes }),
+  startDrag: (id) => ipcRenderer.send('start-drag', String(id)),
+  unstage: (ids) => ipcRenderer.send('unstage', ids),
+  serverInfo: (info) => ipcRenderer.send('server-info', { ttlHours: info.ttlHours, maxMB: info.maxMB }),
+  connState: (st) => ipcRenderer.send('conn-state', String(st)),
+  stopHosting: () => ipcRenderer.send('stop-hosting'),
+  resumeHosting: () => ipcRenderer.send('resume-hosting'),
 });

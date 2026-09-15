@@ -66,7 +66,15 @@ things in from Finder or Explorer. Everything else is the same web UI described 
   can tell what a file is without downloading it.
 - **Quick Look** (Mac): the eye button or the thumbnail opens the decrypted file in Quick
   Look. On Windows it opens in the default app.
-- **Drop files onto the menu bar icon** (Mac) to send them without opening the window.
+- **Drag items out.** Drag a file from the chute straight to your Desktop, a Finder window,
+  or another app. Text items drag out as text. Files are decrypted the moment you press on
+  them, so the drag has a real file behind it.
+- **Click a text item to copy it.** The chevron expands long text; the whole card copies.
+- **Drop files onto the menu bar icon** (Mac). Dragging over the icon pops the window open
+  with a big drop target, so you can drop on the icon or in the window.
+- **Save files to** a folder of your choice (Settings → Behaviour).
+- **Host offline** shows in red the moment the host goes away, and recovers on its own. If
+  the host sets up a new chute, you're asked for the new passphrase.
 - **Send clipboard** from the tray menu: text or a screenshot you just copied.
 - **Downloads** land in your Downloads folder with a notification; click it to reveal.
 - **Launch at login** from the tray menu, so it is always there.
@@ -81,12 +89,18 @@ things in from Finder or Explorer. Everything else is the same web UI described 
   The chute keeps running and nothing is deleted. Unlock again by typing the passphrase.
 - **Quit Chute** closes the app. If you are the host, the chute is offline until you open
   Chute again; the items are still there when it comes back (until they expire).
+- **Stop hosting** (the power button in the window, the tray menu, or Settings) takes the
+  chute off the network. One dialog asks whether to keep the items or delete everything.
+  The chute is paused, not gone: **Start hosting again** brings it back with the same
+  passphrase and, if you kept them, the same items.
 - **Empty the chute** (host, tray menu or Settings) deletes everything in it right now for
   everyone, and keeps hosting.
-- **Stop hosting** (host, tray menu or Settings) takes the chute off the network and deletes
-  everything in it. Teammates can no longer connect.
+- **Delete this chute** (host, Settings) stops hosting, deletes everything, and forgets the
+  passphrase, back to a fresh start.
 - **Leave this chute** (joiner, tray menu or Settings) forgets the address and passphrase
   on this device. Nothing is deleted for anyone else.
+- Settings shows the connection: who's hosting and their address, online/offline, the
+  host's expiry and size limits, and for hosts, how many devices are connected.
 
 ### "Apple could not verify Chute is free of malware"
 

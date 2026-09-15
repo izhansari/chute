@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Chute</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
+<style>
+  :root { --bg: transparent; --text: #1d1d1f; --muted: #6e6e73; --accent: #3478f6; --accent-2: #6a5cff; --surface: rgba(255,255,255,.62); --border: rgba(0,0,0,.08); }
+  @media (prefers-color-scheme: dark) { :root { --text: #f5f5f7; --muted: #98989d; --accent: #4b8dff; --accent-2: #8a7dff; --surface: rgba(60,60,64,.55); --border: rgba(255,255,255,.08); } }
+  html, body { height: 100%; margin: 0; }
+  body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; box-sizing: border-box; -webkit-user-select: none; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; max-width: 320px; }
+  .icon { width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 14px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: flex; align-items: center; justify-content: center; color: #fff; }
+  .icon svg { width: 28px; height: 28px; }
+  h1 { font-size: 17px; margin: 0 0 6px; } p { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+  button { font: inherit; font-weight: 500; padding: 9px 20px; border-radius: 9px; border: 0; cursor: pointer; background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 80%, var(--accent-2))); color: #fff; }
+  .link { background: none; color: var(--accent); padding: 8px; margin-top: 6px; font-weight: 400; }
+</style></head>
+<body><div class="card">
+  <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5v14M16 5v14"/></svg></div>
+  <h1>Hosting is paused</h1>
+  <p>Your chute is off the network. Teammates can't see it until you start hosting again.</p>
+  <button id="resume">Start hosting</button><br>
+  <button class="link" id="settings">Settings…</button>
+</div>
+<script src="paused.js"></script>
+</body></html>

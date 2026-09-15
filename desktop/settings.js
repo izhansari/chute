@@ -99,6 +99,7 @@
   }
   api.onDiscovered((svc) => {
     found.set(svc.url, svc);
+    if (!$('#connJoin').hidden && $('#serverUrl').value === svc.url) $('#connHost').textContent = svc.host || svc.name;
     if (!selectedUrl && found.size === 1) { selectedUrl = svc.url; $('#serverUrl').value = svc.url; }
     renderFound();
   });
@@ -142,6 +143,25 @@
     if (s.mode === 'connect') $('#joinPass').placeholder = 'Leave blank to keep the current passphrase';
     $('#dangerHost').hidden = !(s.mode === 'host' && s.hostConfigured);
     $('#dangerJoin').hidden = s.mode !== 'connect';
+    $('#rowStop').hidden = !!s.hostPaused; $('#rowResume').hidden = !s.hostPaused;
+    $('#downloadDir').textContent = s.downloadDir || '';
+    const fmtTtl = (h) => (!h ? '…' : h % 24 === 0 ? (h / 24) + ' day' + (h === 24 ? '' : 's') : h + ' hours');
+    const fmtMB = (mb) => (!mb ? '…' : mb >= 1024 ? (mb / 1024) + ' GB' : mb + ' MB');
+    if (s.mode === 'connect' && !firstRun) {
+      $('#connJoin').hidden = false;
+      $('#connHost').textContent = (found.get(s.serverUrl) && found.get(s.serverUrl).host) || (s.pinnedHost || '').split(':')[0];
+      $('#connAddr').textContent = s.pinnedHost || '';
+      const st = $('#connState');
+      st.textContent = s.connState === 'online' ? 'Connected' : s.connState === 'offline' ? 'Host offline' : s.connState === 'locked' ? 'Locked' : 'Connecting…';
+      st.className = 'state ' + (s.connState === 'online' ? 'ok' : s.connState === 'offline' ? 'bad' : 'pause');
+      $('#connLimits').textContent = s.serverInfo ? `Items expire after ${fmtTtl(s.serverInfo.ttlHours)} · up to ${fmtMB(s.serverInfo.maxMB)} per item` : 'Unlock the chute to see the host\'s settings';
+    }
+    if (s.mode === 'host' && !firstRun) {
+      $('#connHostInfo').hidden = false;
+      const st = $('#hostState');
+      if (s.hostPaused) { $('#hostStateLabel').textContent = 'Hosting is paused'; $('#hostStateSub').textContent = 'The chute is off the network.'; st.textContent = 'Paused'; st.className = 'state pause'; }
+      else { $('#hostStateLabel').textContent = 'Hosting'; $('#hostStateSub').textContent = `${s.connectedDevices} device${s.connectedDevices === 1 ? '' : 's'} connected right now`; st.textContent = 'Live'; st.className = 'state ok'; }
+    }
     if (!firstRun) {
       document.documentElement.classList.add('compact');
       $('#hostTitle').textContent = 'Settings'; $('#hostSub').textContent = 'You are hosting this chute.';
@@ -183,6 +203,9 @@
   $('#lockBtn').addEventListener('click', async () => { await api.lockDevice(); api.close(); });
   $('#emptyBtn').addEventListener('click', async () => { if (await api.hostAction('empty')) $('#error').textContent = ''; });
   $('#stopBtn').addEventListener('click', async () => { if (await api.hostAction('stop')) location.reload(); });
+  $('#resumeBtn').addEventListener('click', async () => { if (await api.hostAction('resume')) location.reload(); });
+  $('#deleteBtn').addEventListener('click', async () => { if (await api.hostAction('delete')) location.reload(); });
+  $('#chooseDir').addEventListener('click', async () => { $('#downloadDir').textContent = await api.chooseDir(); fit(); });
   $('#leaveBtn').addEventListener('click', async () => { if (await api.hostAction('leave')) location.reload(); });
 
   load();

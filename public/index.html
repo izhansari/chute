@@ -18,6 +18,7 @@
       <span class="status" id="status"><i></i><span id="statusText">Locked</span></span>
     </div>
     <div class="top-right">
+      <button class="icon-btn" id="stopBtn" title="Stop hosting…" hidden></button>
       <button class="icon-btn" id="settingsBtn" title="Settings" hidden></button>
       <button class="icon-btn" id="pinBtn" title="Keep open while you drag things in" hidden></button>
       <button class="icon-btn" id="lockBtn" title="Lock: forget the passphrase on this device" hidden></button>
@@ -78,7 +79,8 @@
     Only ciphertext ever reaches the host. Anyone with the passphrase and access to this network can read the chute.
   </footer>
 </div>
-<div id="dropOverlay" class="drop-overlay" hidden><div><div id="overlayIcon"></div>Drop to send</div></div>
+<div id="dropOverlay" class="drop-overlay" hidden><div><div id="overlayIcon"></div>Drop to send<small>Everyone in the chute gets it</small></div></div>
+<div id="toast" class="toast" hidden></div>
 <script src="/app.js"></script>
 </body>
 </html>
