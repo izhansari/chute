@@ -29,6 +29,17 @@ contextBridge.exposeInMainWorld('chute', {
   closeChute: () => ipcRenderer.send('close-chute'),
   quit: () => ipcRenderer.send('quit'),
   onShowSettings: (cb) => { ipcRenderer.on('show-settings', () => cb()); },
+  onboarding: {
+    get: () => ipcRenderer.invoke('settings:get'),
+    save: (s) => ipcRenderer.invoke('settings:save', s),
+    update: (patch) => ipcRenderer.invoke('settings:update', patch),
+    copy: (text) => ipcRenderer.invoke('settings:copy', String(text)),
+    probe: (url) => ipcRenderer.invoke('settings:probe', String(url || '')),
+    finish: () => ipcRenderer.send('onboarding:finish'),
+    startDiscovery: () => ipcRenderer.send('onboarding:discover', true),
+    stopDiscovery: () => ipcRenderer.send('onboarding:discover', false),
+    onDiscovered: (cb) => { ipcRenderer.on('discovered', (_e, svc) => cb(svc)); },
+  },
   settings: {
     get: () => ipcRenderer.invoke('page-settings:get'),
     update: (patch) => ipcRenderer.invoke('page-settings:update', patch),

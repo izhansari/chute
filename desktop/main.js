@@ -29,7 +29,6 @@ const POPOVER = { width: 400, height: 620 };
 let settings = loadSettings();
 let tray = null;
 let win = null;
-let settingsWin = null;
 let drop = null;
 let bonjour = null;
 let mdnsBrowser = null;
@@ -57,11 +56,16 @@ function rememberPassphrase(p) {
 function recallPassphrase() {
   try { return settings.passEnc && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(settings.passEnc, 'base64')) : null; } catch { return null; }
 }
-// Pin the page colours and the window's blur material to the same appearance.
+// Pin the page colours and the window's blur material to the same appearance. The material is
+// chosen explicitly (a dark one for dark mode) because the effect view does not always follow
+// the app's appearance on its own, which left a light box behind dark text.
+function vibrancyFor() { return nativeTheme.shouldUseDarkColors ? 'hud' : 'popover'; }
 function applyTheme() {
   const t = ['light', 'dark'].includes(settings.theme) ? settings.theme : 'system';
   nativeTheme.themeSource = t;
+  if (IS_MAC && win && !win.isDestroyed()) win.setVibrancy(vibrancyFor());
 }
+nativeTheme.on('updated', () => { if (IS_MAC && win && !win.isDestroyed()) win.setVibrancy(vibrancyFor()); });
 function normalizeUrl(input) {
   let s = String(input || '').trim();
   if (!s) return '';
@@ -72,10 +76,11 @@ function normalizeUrl(input) {
   return u.toString();
 }
 const DESKTOP_QS = '?desktop=' + process.platform;
+const ONBOARD_URL = require('url').pathToFileURL(path.join(__dirname, 'onboarding.html')).href;
 function targetUrl() {
   if (settings.mode === 'host' && drop) return `http://127.0.0.1:${drop.localPort}/` + DESKTOP_QS;
   if (settings.mode === 'connect' && settings.serverUrl) return settings.serverUrl + DESKTOP_QS;
-  return null;
+  return ONBOARD_URL; // nothing set up yet: the popover shows onboarding
 }
 // "is the popover already showing this target?" — compare without the query string
 const sameOrigin = (a, b) => { try { return new URL(a).origin === new URL(b).origin && new URL(a).pathname === new URL(b).pathname; } catch { return a === b; } };
@@ -169,7 +174,7 @@ function createMainWindow() {
     skipTaskbar: true, alwaysOnTop: true, title: 'Chute', icon: path.join(ICONS, 'icon-256.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
   };
-  if (IS_MAC) Object.assign(common, { transparent: true, vibrancy: 'popover', visualEffectState: 'active', hasShadow: true, roundedCorners: true });
+  if (IS_MAC) Object.assign(common, { transparent: true, vibrancy: vibrancyFor(), visualEffectState: 'active', hasShadow: true, roundedCorners: true });
   else if (IS_WIN) Object.assign(common, { backgroundMaterial: 'acrylic', roundedCorners: true, backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f2f2f7' });
   else Object.assign(common, { backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f2f2f7' });
 
@@ -182,12 +187,11 @@ function createMainWindow() {
     setTimeout(() => {
       if (!win || win.isDestroyed() || settings.pinned || nativeDialogOpen || quitting) return;
       if (win.isFocused()) return;
-      if (settingsWin && settingsWin.isFocused()) return;
       if (IS_MAC && app.isActive && app.isActive() && BrowserWindow.getFocusedWindow()) return;
       win.hide();
     }, 120);
   });
-  win.on('show', () => { clearUnread(); applyTheme(); win.webContents.send('shown'); if (IS_MAC) win.setVibrancy('popover'); /* re-apply: the material can drop when a window is shown after loading hidden */ });
+  win.on('show', () => { clearUnread(); applyTheme(); win.webContents.send('shown'); });
   win.on('focus', () => clearUnread());
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { const t = targetUrl(); if (!t || !sameOrigin(url, t)) e.preventDefault(); });
@@ -226,7 +230,6 @@ function loadInto(url) {
 function ensureLoaded() {
   if (!win) createMainWindow();
   const t = targetUrl();
-  if (!t) return false;
   if (!sameOrigin(win.webContents.getURL(), t)) loadInto(t);
   return true;
 }
@@ -234,14 +237,13 @@ function ensureLoaded() {
 async function navigatePopover() {
   if (!win) createMainWindow();
   const t = targetUrl();
-  if (!t) return;
   const wasVisible = win.isVisible();
   if (wasVisible) win.hide();
   await loadInto(t);
   if (wasVisible) { positionNearTray(); win.show(); win.focus(); }
 }
 async function showMain() {
-  if (!ensureLoaded()) return openSettings();
+  ensureLoaded();
   if (loading) await Promise.race([loading, new Promise((r) => setTimeout(r, 2500))]); // let the page paint before showing
   positionNearTray();
   win.show();
@@ -250,23 +252,8 @@ async function showMain() {
 function toggleMain() { if (win && win.isVisible()) win.hide(); else showMain(); }
 
 async function openSettings() {
-  if (settings.mode) { await showMain(); win.webContents.send('show-settings'); return; } // settings live inside the popover
-  if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
-  settingsWin = new BrowserWindow({
-    width: 480, height: 640, resizable: false, fullscreenable: false, maximizable: false, title: 'Chute', show: false, icon: path.join(ICONS, 'icon-256.png'),
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e21' : '#f2f2f7',
-    titleBarStyle: IS_MAC ? 'hiddenInset' : 'default',
-    webPreferences: { preload: path.join(__dirname, 'settings-preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false },
-  });
-  settingsWin.setMenuBarVisibility(false);
-  settingsWin.loadFile(path.join(__dirname, 'settings.html'));
-  settingsWin.once('ready-to-show', () => { settingsWin.show(); if (IS_MAC) app.dock.show(); });
-  settingsWin.on('closed', () => {
-    settingsWin = null; stopDiscovery();
-    if (IS_MAC && !SELF_TEST) app.dock.hide();
-    if (!settings.mode && !quitting && !SELF_TEST) notify('Chute is still here', 'Click the icon in your menu bar whenever you want to finish setting up.', openSettings);
-  });
-  startDiscovery((svc) => { if (settingsWin) settingsWin.webContents.send('discovered', svc); });
+  await showMain();
+  if (settings.mode) win.webContents.send('show-settings'); // settings view inside the popover; onboarding shows itself otherwise
 }
 
 // ---------- notifications + badge ----------
@@ -288,7 +275,8 @@ function clearUnread() { if (unread) setUnread(0); }
 // ---------- sending from native surfaces ----------
 const MAX_NATIVE_FILE = 512 * 1024 * 1024;
 function pushToPage(channel, payload) {
-  if (!ensureLoaded()) return openSettings();
+  if (!settings.mode) { showMain(); return; } // still onboarding
+  ensureLoaded();
   if (!win.isVisible()) showMain();
   win.webContents.send(channel, payload);
 }
@@ -363,7 +351,8 @@ function createTray() {
     tray.on('drop-text', (e, text) => { clearTimeout(trayDragHideTimer); pushToPage('drop-text', text); });
     tray.on('drag-enter', () => {
       clearTimeout(trayDragHideTimer);
-      if (!ensureLoaded()) return;
+      if (!settings.mode) return;
+      ensureLoaded();
       if (!win.isVisible()) { positionNearTray(); win.showInactive(); }
       win.webContents.send('tray-drag', true);
     });
@@ -541,9 +530,9 @@ function probeChute(url) {
     }, 5000);
     const req = https.request({ host: u.hostname, port: u.port || 443, path: '/api/salt', method: 'GET', rejectUnauthorized: false, timeout: 5000 }, (res) => {
       let body = '';
+      const cert = res.socket && res.socket.getPeerCertificate ? res.socket.getPeerCertificate() : null; // grab it now; the socket may be gone by 'end'
       res.on('data', (d) => { body += d; });
       res.on('end', () => {
-        const cert = res.socket.getPeerCertificate();
         const fpHex = (cert && cert.fingerprint256) || '';
         const fpB64 = fpHex ? 'sha256/' + Buffer.from(fpHex.replace(/:/g, ''), 'hex').toString('base64') : '';
         const pinned = settings.pins[u.host];
@@ -586,12 +575,7 @@ ipcMain.handle('settings:get', () => {
   };
 });
 ipcMain.handle('settings:reveal-passphrase', () => recallPassphrase());
-ipcMain.handle('settings:choose-dir', async () => {
-  const r = await dialog.showOpenDialog(settingsWin || undefined, { properties: ['openDirectory', 'createDirectory'], defaultPath: settings.downloadDir || app.getPath('downloads'), message: 'Where should Chute save files?' });
-  if (r.canceled || !r.filePaths[0]) return settings.downloadDir || app.getPath('downloads');
-  settings.downloadDir = r.filePaths[0]; saveSettings();
-  return settings.downloadDir;
-});
+
 ipcMain.handle('settings:save', async (e, s) => {
   try {
     settings.notifications = !!s.notifications;
@@ -618,12 +602,12 @@ ipcMain.handle('settings:save', async (e, s) => {
     saveSettings();
     applyLoginItem();
     refreshTray();
-    await navigatePopover(); // reload hidden so the popover is ready (and unlocked) when opened
+    stopDiscovery();
     return { ok: true, hostUrls: drop ? drop.urls() : null };
   } catch (err) { return { ok: false, error: err.message }; }
 });
-ipcMain.on('settings:close', () => { if (settingsWin) settingsWin.close(); });
-ipcMain.on('settings:finish', () => { if (settingsWin) settingsWin.close(); showMain(); });
+ipcMain.on('onboarding:finish', async () => { await navigatePopover(); showMain(); });
+ipcMain.on('onboarding:discover', (e, on) => { if (on) startDiscovery((svc) => { if (win && !win.isDestroyed()) win.webContents.send('discovered', svc); }); else stopDiscovery(); });
 ipcMain.handle('settings:update', (e, patch) => {
   if (patch && typeof patch === 'object') {
     if ('launchAtLogin' in patch) { settings.launchAtLogin = !!patch.launchAtLogin; applyLoginItem(); }
@@ -632,8 +616,7 @@ ipcMain.handle('settings:update', (e, patch) => {
   }
   return true;
 });
-function lockDevice() { if (win) win.webContents.send('lock'); }
-ipcMain.handle('settings:lock-device', () => { lockDevice(); return true; });
+
 
 async function confirm(parent, message, detail, button) {
   const { response } = await dialog.showMessageBox(parent || undefined, { type: 'warning', buttons: ['Cancel', button], defaultId: 0, cancelId: 0, message, detail });
@@ -652,7 +635,6 @@ async function deleteChute() {
   cleanDir(HOST_DIR);
   settings.mode = null; settings.passEnc = ''; saveSettings();
   await forgetPageState();
-  if (win) { win.hide(); win.loadURL('about:blank'); }
   refreshTray();
 }
 async function closeChuteDialog(parent) {
@@ -663,27 +645,19 @@ async function closeChuteDialog(parent) {
     if (!await confirm(parent, 'Leave this chute?', 'This device forgets the address and passphrase. Nothing is deleted for anyone else.', 'Leave')) return false;
     await leaveChute();
   }
-  openSettings();
+  await navigatePopover(); // onboarding
+  if (win && !win.isVisible()) showMain();
   return true;
 }
 async function leaveChute() {
   settings.mode = null; settings.serverUrl = ''; settings.passEnc = ''; saveSettings();
   await forgetPageState();
-  if (win) { win.hide(); win.loadURL('about:blank'); }
   refreshTray();
 }
-ipcMain.handle('settings:host-action', async (e, what) => {
-  if (what === 'delete' || what === 'leave') return closeChuteDialog(settingsWin);
-  return false;
-});
+
 ipcMain.on('settings:open-external', (e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
 ipcMain.handle('settings:copy', (e, text) => { clipboard.writeText(String(text).slice(0, 4096)); return true; });
-ipcMain.on('settings:resize', (e, h) => {
-  if (!settingsWin || !Number.isFinite(h)) return;
-  const wa = screen.getDisplayMatching(settingsWin.getBounds()).workArea;
-  const [w] = settingsWin.getContentSize();
-  settingsWin.setContentSize(w, Math.max(420, Math.min(Math.round(h), Math.round(wa.height * 0.85))), true);
-});
+
 
 // Downloads go straight to ~/Downloads with a notification instead of a save dialog.
 function wireDownloads() {
@@ -724,8 +698,7 @@ app.whenReady().then(async () => {
   cleanDir(STAGE_DIR);
   refreshTray();
   const hidden = process.argv.includes('--hidden') || (app.getLoginItemSettings().wasOpenedAsHidden);
-  if (!settings.mode) openSettings();
-  else if (!hidden) showMain();
+  if (!settings.mode || !hidden) showMain();
   else ensureLoaded(); // load in the background so notifications work
 });
 app.on('window-all-closed', () => { /* stay in the tray */ });
@@ -746,40 +719,36 @@ async function runSelfTest() {
   try {
     settings.pinned = true; saveSettings();
 
-    // Onboarding screenshots: welcome (first run), setup, done
+    // Onboarding inside the popover: welcome → choose → host → done
     settings.mode = null; saveSettings();
-    openSettings();
-    await new Promise((r) => settingsWin.webContents.once('did-finish-load', r));
+    createMainWindow();
+    await loadInto(targetUrl());
+    positionNearTray(); win.show();
     await wait(900);
-    fs.writeFileSync(path.join(out, 'onboard-welcome.png'), (await settingsWin.webContents.capturePage()).toPNG());
-    await settingsWin.webContents.executeJavaScript('document.getElementById("primary").click(); true');
-    await wait(900);
-    fs.writeFileSync(path.join(out, 'onboard-choose.png'), (await settingsWin.webContents.capturePage()).toPNG());
-    results.dots = await settingsWin.webContents.executeJavaScript('(() => { const d = document.querySelectorAll("#dots i"); const r = d[1].getBoundingClientRect(); return { count: d.length, onIndex: [...d].findIndex(x => x.classList.contains("on")), w: r.width, h: r.height, top: r.top }; })()');
-    await settingsWin.webContents.executeJavaScript('document.getElementById("chooseJoin").click(); true');
-    await wait(900);
-    fs.writeFileSync(path.join(out, 'onboard-join.png'), (await settingsWin.webContents.capturePage()).toPNG());
-    await settingsWin.webContents.executeJavaScript('document.getElementById("back").click(); true');
-    await wait(400);
-    await settingsWin.webContents.executeJavaScript('document.getElementById("chooseHost").click(); document.getElementById("pass").value = "test-passphrase-123"; document.getElementById("port").value = "8543"; true');
-    await wait(700);
-    fs.writeFileSync(path.join(out, 'onboard-host.png'), (await settingsWin.webContents.capturePage()).toPNG());
-    await settingsWin.webContents.executeJavaScript('document.getElementById("primary").click(); true'); // saves: writes config, starts host, hands passphrase to the page
+    fs.writeFileSync(path.join(out, 'onboard-welcome.png'), (await win.webContents.capturePage()).toPNG());
+    results.onboardInPopover = win.webContents.getURL() === ONBOARD_URL;
+    await win.webContents.executeJavaScript('document.getElementById("primary").click(); true');
+    await wait(500);
+    fs.writeFileSync(path.join(out, 'onboard-choose.png'), (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('document.getElementById("chooseJoin").click(); true');
+    await wait(500);
+    fs.writeFileSync(path.join(out, 'onboard-join.png'), (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('document.getElementById("back").click(); document.getElementById("chooseHost").click(); document.getElementById("pass").value = "test-passphrase-123"; document.getElementById("port").value = "8543"; true');
+    await wait(500);
+    fs.writeFileSync(path.join(out, 'onboard-host.png'), (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript('document.getElementById("primary").click(); true');
     await wait(3000);
-    fs.writeFileSync(path.join(out, 'onboard-done.png'), (await settingsWin.webContents.capturePage()).toPNG());
-    settingsWin.close();
-    await wait(400);
+    fs.writeFileSync(path.join(out, 'onboard-done.png'), (await win.webContents.capturePage()).toPNG());
     results.modeAfterSetup = settings.mode;
     results.passphraseRecalled = recallPassphrase() === 'test-passphrase-123';
     results.probeOwnHost = await probeChute(drop.urls().lan[1]);
     results.probeNothingThere = await probeChute('https://127.0.0.1:8599/');
     results.maxTotalMB = hostConfig().maxTotalMB;
-
     results.urls = drop ? drop.urls() : null;
+    await win.webContents.executeJavaScript('document.getElementById("primary").click(); true'); // Open Chute
+    await wait(4000);
 
     // The popover must come up already unlocked (no second passphrase prompt)
-    if (!win) createMainWindow();
-    await wait(4000);
     positionNearTray(); win.show();
     results.bridge = await win.webContents.executeJavaScript('typeof window.chute === "object" && typeof window.chute.notify === "function"');
     results.autoUnlocked = await win.webContents.executeJavaScript('document.getElementById("gate").hidden && !document.getElementById("app").hidden');

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" class="desktop">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self'">
+<meta name="color-scheme" content="light dark">
+<title>Chute</title>
+<style>
+  :root {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --tint: rgba(242,242,247,.55); --surface: rgba(255,255,255,.62); --surface-2: rgba(255,255,255,.5); --text: #1d1d1f; --muted: #6e6e73;
+    --border: rgba(0,0,0,.08); --border-strong: rgba(0,0,0,.16); --accent: #3478f6; --accent-2: #6a5cff; --accent-soft: rgba(52,120,246,.12);
+    --danger: #e5453c; --success: #34c759; --seg: rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --tint: rgba(28,28,30,.55); --surface: rgba(60,60,64,.55); --surface-2: rgba(80,80,86,.5); --text: #f5f5f7; --muted: #98989d;
+      --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.18); --accent: #4b8dff; --accent-2: #8a7dff; --accent-soft: rgba(75,141,255,.18);
+      --danger: #ff5f57; --success: #30d158; --seg: rgba(255,255,255,.08); }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 13.5px/1.45 var(--font); color: var(--text); background: var(--tint); -webkit-font-smoothing: antialiased; -webkit-user-select: none; display: flex; flex-direction: column; overflow: hidden; }
+  input { -webkit-user-select: text; font-family: var(--font); }
+  .arrow { position: fixed; top: 0; left: 50%; width: 16px; height: 8px; transform: translateX(-50%); background: var(--surface); clip-path: polygon(50% 0, 100% 100%, 0 100%); opacity: .9; }
+  .dots { display: flex; justify-content: center; align-items: center; gap: 7px; height: 26px; flex: 0 0 auto; padding-top: 8px; }
+  .dots i { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); transition: background .2s, transform .2s; }
+  .dots i.done { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .dots i.on { background: var(--accent); transform: scale(1.25); }
+  main { flex: 1; overflow: auto; padding: 4px 14px 8px; }
+  .footer { flex: 0 0 auto; padding: 8px 14px 12px; display: flex; align-items: center; gap: 8px; }
+  .footer .spacer { flex: 1; }
+  .error { color: var(--danger); font-size: 12px; flex: 1 1 100%; word-break: break-word; }
+  .error:empty { display: none; }
+  .step[hidden] { display: none; }
+
+  .hero { text-align: center; padding: 6px 0 12px; }
+  .hero img { width: 56px; height: 56px; border-radius: 14px; box-shadow: 0 6px 18px rgba(52,120,246,.25); }
+  .hero.big img { width: 80px; height: 80px; border-radius: 20px; }
+  .hero h1 { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 2px; }
+  .hero.big h1 { font-size: 23px; margin-top: 14px; }
+  .hero p { margin: 0; color: var(--muted); font-size: 12.5px; }
+
+  .features { display: flex; flex-direction: column; gap: 8px; }
+  .feature { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; }
+  .feature .fi { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; }
+  .feature .fi svg { width: 18px; height: 18px; }
+  .feature .fi.a { background: linear-gradient(135deg, #3478f6, #6a5cff); } .feature .fi.b { background: linear-gradient(135deg, #34c759, #00b3a4); } .feature .fi.c { background: linear-gradient(135deg, #f09a1a, #ff375f); }
+  .feature strong { display: block; font-size: 13px; margin-bottom: 1px; }
+  .feature span { color: var(--muted); font-size: 12px; }
+
+  .choices { display: flex; flex-direction: column; gap: 8px; }
+  .choice { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 13px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font: inherit; color: var(--text); transition: border-color .12s, background .12s; }
+  .choice:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .choice .ci { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; }
+  .choice .ci svg { width: 20px; height: 20px; }
+  .choice .ci.host { background: linear-gradient(135deg, #3478f6, #6a5cff); } .choice .ci.join { background: linear-gradient(135deg, #34c759, #00b3a4); }
+  .choice strong { display: block; font-size: 13.5px; margin-bottom: 1px; }
+  .choice span { color: var(--muted); font-size: 12px; }
+  .choice .chev { margin-left: auto; color: var(--muted); flex: 0 0 auto; } .choice .chev svg { width: 14px; height: 14px; }
+  .choice .grow { flex: 1; min-width: 0; }
+
+  .group { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-height: 40px; }
+  .row + .row, .row + .field-row, .field-row + .row, .field-row + .field-row { border-top: 1px solid var(--border); }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .label { font-weight: 500; }
+  .row .sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .section-title { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 2px 0 5px 6px; }
+  .field { width: 100%; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); outline: none; }
+  .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field.mini { width: 74px; text-align: center; padding: 5px 8px; }
+  .select { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; padding: 5px 26px 5px 10px; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 14px; }
+  .with-btn { position: relative; } .with-btn .field { padding-right: 34px; }
+  .with-btn .icon-btn { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); }
+  .icon-btn { width: 28px; height: 28px; border: 0; background: transparent; color: var(--muted); border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .icon-btn:hover { background: var(--seg); color: var(--text); } .icon-btn svg { width: 16px; height: 16px; }
+  .hint { color: var(--muted); font-size: 12px; margin: 5px 4px 0; }
+  .field-row { padding: 10px 12px; }
+  .field-row label.top { display: block; font-weight: 500; margin-bottom: 6px; }
+  details.adv { margin: -4px 0 10px; }
+  details.adv summary { list-style: none; cursor: pointer; color: var(--accent); font-size: 12.5px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px; }
+  details.adv summary::-webkit-details-marker { display: none; }
+  details.adv summary::before { content: "▸"; font-size: 10px; transition: transform .15s; }
+  details.adv[open] summary::before { transform: rotate(90deg); }
+  details.adv .group { margin-top: 8px; }
+  .host-row { cursor: pointer; } .host-row:hover { background: var(--surface-2); }
+  .host-row .pc { width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .host-row .pc svg { width: 17px; height: 17px; }
+  .host-row .tick { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; }
+  .host-row.selected .tick { background: var(--accent); border-color: var(--accent); }
+  .host-row .tick svg { width: 12px; height: 12px; display: none; } .host-row.selected .tick svg { display: block; }
+  .scanning { color: var(--muted); }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex: 0 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .addr { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .switch { appearance: none; width: 38px; height: 22px; border-radius: 11px; background: var(--border-strong); border: 0; position: relative; cursor: pointer; margin: 0; transition: background .15s; flex: 0 0 auto; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .18s; }
+  .switch:checked { background: var(--success); } .switch:checked::after { transform: translateX(16px); } .switch:disabled { opacity: .45; }
+  .btn { font: inherit; font-weight: 500; font-size: 13px; padding: 7px 15px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); min-width: 80px; }
+  .btn.primary { background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 80%, var(--accent-2))); border-color: transparent; color: #fff; }
+  .btn.primary.wide { min-width: 180px; padding: 9px 20px; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .next .row .num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 11.5px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .kbd { font-size: 11px; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--surface-2); }
+</style>
+</head>
+<body>
+  <div class="arrow"></div>
+  <div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+  <main>
+    <section class="step" id="stepWelcome" hidden>
+      <div class="hero big"><img src="icons/icon-256.png" alt=""><h1>Welcome to Chute</h1><p>The quickest way to get a file or a bit of text to someone in the room.</p></div>
+      <div class="features">
+        <div class="feature"><div class="fi a" data-icon="chute"></div><div><strong>Drop it in, it's everywhere</strong><span>Drag a file onto the menu bar icon, or paste text. Everyone on the same Wi-Fi sees it instantly.</span></div></div>
+        <div class="feature"><div class="fi b" data-icon="lock"></div><div><strong>Locked with a shared passphrase</strong><span>Everything is encrypted before it leaves your device.</span></div></div>
+        <div class="feature"><div class="fi c" data-icon="clock"></div><div><strong>Gone in a day</strong><span>Items delete themselves. Nothing piles up.</span></div></div>
+      </div>
+    </section>
+
+    <section class="step" id="stepChoose" hidden>
+      <div class="hero"><img src="icons/icon-256.png" alt=""><h1>Host or join?</h1><p>One person hosts the chute. Everyone else joins it with the passphrase.</p></div>
+      <div class="choices">
+        <button class="choice" type="button" id="chooseHost"><div class="ci host" data-icon="home"></div><div class="grow"><strong>Host a chute</strong><span>This computer keeps it running for everyone.</span></div><div class="chev" data-icon="chev"></div></button>
+        <button class="choice" type="button" id="chooseJoin"><div class="ci join" data-icon="people"></div><div class="grow"><strong>Join a chute</strong><span>Someone nearby is already hosting one.</span></div><div class="chev" data-icon="chev"></div></button>
+      </div>
+    </section>
+
+    <section class="step" id="stepJoin" hidden>
+      <div class="hero"><img src="icons/icon-256.png" alt=""><h1>Join a chute</h1><p>Pick the computer that's hosting it and enter the passphrase.</p></div>
+      <div class="section-title">On your network</div>
+      <div class="group" id="hostList"></div>
+      <div class="group">
+        <div class="field-row"><label class="top" for="serverUrl">Or enter an address</label><input class="field" type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false" autocomplete="off"><div class="hint" id="addrHint"></div></div>
+        <div class="field-row"><label class="top" for="joinPass">Chute passphrase</label><div class="with-btn"><input class="field" type="password" id="joinPass" placeholder="Ask whoever is hosting" autocomplete="off"><button class="icon-btn" type="button" data-toggle="joinPass"></button></div></div>
+      </div>
+    </section>
+
+    <section class="step" id="stepHost" hidden>
+      <div class="hero"><img src="icons/icon-256.png" alt=""><h1>Host a chute</h1><p>Choose a passphrase. Your teammates will use it to join.</p></div>
+      <div class="section-title">Passphrase</div>
+      <div class="group"><div class="field-row"><div class="with-btn"><input class="field" type="password" id="pass" placeholder="At least 8 characters" autocomplete="new-password"><button class="icon-btn" type="button" data-toggle="pass"></button></div><div class="hint">Share it with teammates in person. It never leaves this computer.</div></div></div>
+      <div class="section-title">Options</div>
+      <div class="group">
+        <div class="row"><div class="grow"><div class="label">Keep items for</div></div><select class="select" id="ttl"><option value="1">1 hour</option><option value="6">6 hours</option><option value="12">12 hours</option><option value="24" selected>1 day</option><option value="72">3 days</option><option value="168">1 week</option></select></div>
+        <div class="row"><div class="grow"><div class="label">Maximum item size</div></div><select class="select" id="max"><option value="100">100 MB</option><option value="250">250 MB</option><option value="512" selected>512 MB</option><option value="1024">1 GB</option><option value="2048">2 GB</option></select></div>
+        <div class="row"><div class="grow"><div class="label">Maximum chute size</div></div><select class="select" id="maxTotal"><option value="1024">1 GB</option><option value="2048">2 GB</option><option value="5120">5 GB</option><option value="10240" selected>10 GB</option><option value="20480">20 GB</option><option value="0">No limit</option></select></div>
+      </div>
+      <details class="adv"><summary>Advanced</summary><div class="group"><div class="row"><div class="grow"><div class="label">Port</div><div class="sub">Only change this if another app uses it</div></div><input class="field mini" type="text" inputmode="numeric" id="port" value="8443" maxlength="5"></div></div></details>
+    </section>
+
+    <section class="step" id="stepDone" hidden>
+      <div class="hero"><img src="icons/icon-256.png" alt=""><h1>You're in</h1><p id="doneSub"></p></div>
+      <div class="section-title">What to do next</div>
+      <div class="group next">
+        <div class="row"><div class="num">1</div><div class="grow"><div class="label">Click the Chute icon in the menu bar to open it</div></div></div>
+        <div class="row"><div class="num">2</div><div class="grow"><div class="label">Drag a file onto the icon, or paste into the window</div><div class="sub">Press <span class="kbd">Esc</span> to close the window.</div></div></div>
+        <div class="row"><div class="num">3</div><div class="grow"><div class="label" id="tip3">Tell your teammates the passphrase</div><div class="sub" id="tip3sub">They install Chute, pick this computer from the list, and type it once.</div></div></div>
+      </div>
+      <div class="group"><label class="row"><div class="grow"><div class="label">Start Chute when I log in</div><div class="sub" id="doneLoginHint">So it's always in the menu bar.</div></div><input type="checkbox" class="switch" id="doneLaunch"></label></div>
+      <div id="doneUrls" hidden><div class="section-title">Your address</div><div class="group"><div class="row"><div class="grow"><div class="addr" id="donePrimaryUrl"></div><div class="sub">For anyone joining from a browser.</div></div><button class="icon-btn" type="button" id="doneCopyUrl"></button></div></div></div>
+    </section>
+  </main>
+  <div class="footer">
+    <span class="error" id="error"></span>
+    <button class="btn" id="back" type="button" hidden>Back</button>
+    <span class="spacer"></span>
+    <button class="btn primary" id="primary" type="button">Get started</button>
+  </div>
+  <script src="onboarding.js"></script>
+</body>
+</html>

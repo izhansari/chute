@@ -6,8 +6,8 @@ it pops out on everyone else's. End-to-end encrypted, gone in a day.
 ## Download
 
 - **Mac** (Intel and Apple Silicon, signed and notarized):
-  [Chute-1.0.5-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.5/Chute-1.0.5-mac-universal.dmg)
-- **Windows**: [Chute-1.0.5-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.5/Chute-1.0.5-win-x64.exe)
+  [Chute-1.0.6-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.6/Chute-1.0.6-mac-universal.dmg)
+- **Windows**: [Chute-1.0.6-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.6/Chute-1.0.6-win-x64.exe)
   (unsigned: SmartScreen shows "More info → Run anyway" once)
 
 All releases: https://github.com/izhansari/chute/releases
@@ -51,12 +51,13 @@ Or run it straight from source while developing:
 npm run desktop
 ```
 
-First launch walks you through it one step at a time: welcome, host or join, the details
-for that choice (passphrase and, for hosts, a couple of options), then a "you're in" page.
-The passphrase you enter there also unlocks the chute window, so you type it once.
+Everything lives in the menu bar window. First launch walks you through it there, one
+step at a time: welcome, host or join, the details for that choice (passphrase and, for
+hosts, a couple of options), then a "you're in" page. The passphrase you enter also unlocks
+the chute, so you type it once.
 
-Later, the gear button in the window (or "Settings…" in the tray menu) opens the same
-screen:
+Later, the gear button in the window (or "Settings…" in the tray menu) opens Settings in
+the same window:
 
 - **Host the chute on this computer**: choose the shared passphrase. The chute runs in the
   background whenever this computer is on and announces itself on the network.
@@ -112,9 +113,8 @@ The gear opens Settings inside the popover. Every change saves immediately:
   teammates use.
 - **Options** (host): keep items for, maximum item size, maximum chute size, port.
 - **Behaviour**: notifications, launch at login, where to save files, and **Appearance**
-  (Auto / Light / Dark). If the window ever looks like a flat light box with light text,
-  pick Light or Dark explicitly: that pins the page and the window's blur material to the
-  same appearance.
+  (Auto / Light / Dark). The window's blur material is chosen per theme (a dark one in dark
+  mode) and the page adds its own tint, so the two always agree.
 - The version and a Quit button are at the bottom.
 
 ## Plain server: setup (once, on the machine that will host the chute)
@@ -188,7 +188,7 @@ That is the normal limit of any web-based end-to-end encryption.
 - `lib/setup.js`: key derivation, certificate generation, config writing
 - `server.js`, `setup.js`: command-line entry points
 - `public/`: the web UI, served by the host and loaded by the desktop app
-- `desktop/`: Electron shell (popover, tray, badge, notifications, settings, discovery, cert pinning)
+- `desktop/`: Electron shell (popover, tray, badge, notifications, onboarding page, discovery, cert pinning)
 
 ## Notes
 
