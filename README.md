@@ -6,8 +6,8 @@ it pops out on everyone else's. End-to-end encrypted, gone in a day.
 ## Download
 
 - **Mac** (Intel and Apple Silicon, signed and notarized):
-  [Chute-1.0.3-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.3/Chute-1.0.3-mac-universal.dmg)
-- **Windows**: [Chute-1.0.3-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.3/Chute-1.0.3-win-x64.exe)
+  [Chute-1.0.4-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.4/Chute-1.0.4-mac-universal.dmg)
+- **Windows**: [Chute-1.0.4-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.4/Chute-1.0.4-win-x64.exe)
   (unsigned: SmartScreen shows "More info → Run anyway" once)
 
 All releases: https://github.com/izhansari/chute/releases

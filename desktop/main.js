@@ -16,6 +16,7 @@ const { writeConfig } = require('../lib/setup');
 
 const SELF_TEST = process.env.CHUTE_SELFTEST || null;
 if (SELF_TEST) app.setPath('userData', path.join(SELF_TEST, 'userData'));
+else if (process.env.CHUTE_USERDATA) app.setPath('userData', process.env.CHUTE_USERDATA); // dev: run against a scratch profile
 
 const IS_MAC = process.platform === 'darwin';
 const IS_WIN = process.platform === 'win32';
@@ -96,14 +97,24 @@ function getBonjour() {
   catch (e) { console.log('[mdns] unavailable:', e.message); }
   return bonjour;
 }
-function advertise(port) {
+function advertise(port, attempt = 0) {
   const b = getBonjour();
   if (!b) return;
   try {
     const host = os.hostname().split('.')[0];
+    const suffix = attempt ? ` (${attempt + 1})` : '';
+    const base = SELF_TEST ? `Chute test on ${host}` : `Chute on ${host}`;
     // Advertise under our own mDNS hostname: answering for the machine's real
     // "<host>.local" from a second responder makes macOS rename the computer.
-    mdnsService = b.publish({ name: `Chute on ${host}`, type: 'chute', port, host: `chute-${host.toLowerCase()}.local`, txt: { v: '1', host } });
+    mdnsService = b.publish({ name: base + suffix, type: 'chute', port, host: `chute-${host.toLowerCase()}${attempt ? '-' + (attempt + 1) : ''}.local`, txt: { v: '1', host } });
+    // A name clash (another Chute with the same computer name, or two copies running) is reported
+    // asynchronously; unhandled it would crash the app. Retry with a numbered name instead.
+    mdnsService.on('error', (err) => {
+      console.log('[mdns] publish error:', err && err.message);
+      try { mdnsService.stop(); } catch { /* ignore */ }
+      mdnsService = null;
+      if (attempt < 5 && /in use/i.test(String(err && err.message))) setTimeout(() => advertise(port, attempt + 1), 500);
+    });
   } catch (e) { console.log('[mdns] publish failed:', e.message); }
 }
 function unadvertise() { if (mdnsService) { try { mdnsService.stop(); } catch { /* ignore */ } mdnsService = null; } }
@@ -155,7 +166,7 @@ function createMainWindow() {
     skipTaskbar: true, alwaysOnTop: true, title: 'Chute', icon: path.join(ICONS, 'icon-256.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
   };
-  if (IS_MAC) Object.assign(common, { transparent: true, backgroundColor: '#00000000', vibrancy: 'popover', visualEffectState: 'active', hasShadow: true, roundedCorners: true });
+  if (IS_MAC) Object.assign(common, { transparent: true, vibrancy: 'popover', visualEffectState: 'active', hasShadow: true, roundedCorners: true });
   else if (IS_WIN) Object.assign(common, { backgroundMaterial: 'acrylic', roundedCorners: true, backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f2f2f7' });
   else Object.assign(common, { backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f2f2f7' });
 
@@ -173,7 +184,7 @@ function createMainWindow() {
       win.hide();
     }, 120);
   });
-  win.on('show', () => { clearUnread(); win.webContents.send('shown'); });
+  win.on('show', () => { clearUnread(); win.webContents.send('shown'); if (IS_MAC) win.setVibrancy('popover'); /* re-apply: the material can drop when a window is shown after loading hidden */ });
   win.webContents.on('did-finish-load', () => { if (settings.hostPaused && win.webContents.getURL() === PAUSED_URL) return; });
   win.on('focus', () => clearUnread());
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
@@ -660,6 +671,8 @@ function wireDownloads() {
 }
 
 // ---------- lifecycle ----------
+process.on('uncaughtException', (err) => { console.error('[chute] uncaught:', err && err.stack || err); });
+process.on('unhandledRejection', (err) => { console.error('[chute] unhandled rejection:', err && err.stack || err); });
 if (!app.requestSingleInstanceLock()) app.quit();
 app.on('second-instance', () => showMain());
 
@@ -683,7 +696,13 @@ app.whenReady().then(async () => {
   else ensureLoaded(); // load in the background so notifications work
 });
 app.on('window-all-closed', () => { /* stay in the tray */ });
-app.on('before-quit', () => { quitting = true; cleanDir(PREVIEW_DIR); cleanDir(STAGE_DIR); stopHost(); if (bonjour) { try { bonjour.destroy(); } catch { /* ignore */ } } });
+app.on('before-quit', () => {
+  quitting = true;
+  cleanDir(PREVIEW_DIR); cleanDir(STAGE_DIR);
+  stopHost();
+  if (bonjour) { try { bonjour.destroy(); } catch { /* ignore */ } }
+  setTimeout(() => app.exit(0), 2000).unref(); // never let a slow shutdown (mDNS goodbye packets etc.) keep the app alive
+});
 app.on('activate', () => showMain());
 
 // ---------- self test (development): host mode, screenshots, native drops, quits ----------
