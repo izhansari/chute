@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('settingsApi', {
   get: () => ipcRenderer.invoke('settings:get'),
   save: (s) => ipcRenderer.invoke('settings:save', s),
   close: () => ipcRenderer.send('settings:close'),
+  finish: () => ipcRenderer.send('settings:finish'),
+  hostAction: (what) => ipcRenderer.invoke('settings:host-action', String(what)),
   openExternal: (url) => ipcRenderer.send('settings:open-external', url),
   copy: (text) => ipcRenderer.invoke('settings:copy', String(text)),
   resize: (h) => ipcRenderer.send('settings:resize', Number(h)),

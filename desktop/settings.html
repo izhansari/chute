@@ -9,12 +9,12 @@
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
     --bg: #f2f2f7; --surface: #fff; --surface-2: #f4f4f8; --text: #1d1d1f; --muted: #6e6e73;
     --border: rgba(0,0,0,.09); --border-strong: rgba(0,0,0,.16); --accent: #3478f6; --accent-2: #6a5cff; --accent-soft: rgba(52,120,246,.12);
-    --danger: #e5453c; --success: #34c759; --seg: rgba(0,0,0,.06); --shadow: 0 1px 2px rgba(0,0,0,.05);
+    --danger: #e5453c; --danger-soft: rgba(229,69,60,.1); --success: #34c759; --seg: rgba(0,0,0,.06); --shadow: 0 1px 2px rgba(0,0,0,.05);
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #1e1e21; --surface: #2a2a2e; --surface-2: #35353a; --text: #f5f5f7; --muted: #98989d;
       --border: rgba(255,255,255,.09); --border-strong: rgba(255,255,255,.18); --accent: #4b8dff; --accent-2: #8a7dff; --accent-soft: rgba(75,141,255,.18);
-      --danger: #ff5f57; --success: #30d158; --seg: rgba(255,255,255,.08); --shadow: none; }
+      --danger: #ff5f57; --danger-soft: rgba(255,95,87,.12); --success: #30d158; --seg: rgba(255,255,255,.08); --shadow: none; }
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -23,16 +23,29 @@
   .titlebar { height: 38px; flex: 0 0 auto; -webkit-app-region: drag; }
   html.win .titlebar { height: 8px; }
   main { flex: 1; overflow: auto; padding: 0 28px 4px; }
-  .hero { padding-top: 0; }
   .footer { flex: 0 0 auto; padding: 10px 28px 20px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
   .footer .error { flex: 1 1 100%; text-align: left; margin-bottom: 6px; line-height: 1.4; word-break: break-word; }
   .footer .error:empty { display: none; }
+  .footer .spacer { flex: 1; }
+  .step[hidden] { display: none; }
 
   /* hero */
   .hero { text-align: center; padding: 0 0 16px; }
   .hero img { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(52,120,246,.25); }
+  .hero.big img { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 10px 28px rgba(52,120,246,.3); }
   .hero h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin: 12px 0 2px; }
+  .hero.big h1 { font-size: 26px; margin-top: 18px; }
   .hero p { margin: 0; color: var(--muted); font-size: 13px; }
+  .hero.big p { font-size: 14px; }
+
+  /* welcome features */
+  .features { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 6px; }
+  .feature { display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .feature .fi { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; }
+  .feature .fi svg { width: 20px; height: 20px; }
+  .feature .fi.a { background: linear-gradient(135deg, #3478f6, #6a5cff); } .feature .fi.b { background: linear-gradient(135deg, #34c759, #00b3a4); } .feature .fi.c { background: linear-gradient(135deg, #f09a1a, #ff375f); }
+  .feature strong { display: block; font-size: 13.5px; margin-bottom: 1px; }
+  .feature span { color: var(--muted); }
 
   /* segmented control */
   .seg { display: grid; grid-template-columns: 1fr 1fr; position: relative; background: var(--seg); border-radius: 9px; padding: 2px; margin: 0 auto 16px; max-width: 320px; }
@@ -41,16 +54,16 @@
   .seg .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); border-radius: 7px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.15); transition: transform .18s cubic-bezier(.2,.8,.2,1); }
   .seg.host .thumb { transform: translateX(100%); }
 
-  /* grouped lists (System Settings style) */
+  /* grouped lists */
   .group { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 14px; }
   .row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 44px; }
-  .row + .row { border-top: 1px solid var(--border); }
+  .row + .row, .row + .field-row, .field-row + .row { border-top: 1px solid var(--border); }
   .row .grow { flex: 1; min-width: 0; }
   .row .label { font-weight: 500; }
   .row .sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
   .section-title { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 2px 0 6px 6px; }
 
-  /* text fields */
+  /* fields */
   .field { width: 100%; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); outline: none; transition: border-color .12s, box-shadow .12s; }
   .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .field.mini { width: 78px; text-align: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
@@ -58,7 +71,6 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 14px; }
   .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .unit { color: var(--muted); font-size: 12px; margin-left: 6px; width: 24px; }
   .with-btn { position: relative; }
   .with-btn .field { padding-right: 36px; }
   .with-btn .icon-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
@@ -69,9 +81,6 @@
   .field-row { padding: 12px 14px; }
   .field-row + .field-row { border-top: 1px solid var(--border); }
   .field-row label.top { display: block; font-weight: 500; margin-bottom: 6px; }
-  .inline-fields { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-  .inline-fields > div { display: flex; align-items: center; gap: 8px; }
-  .inline-fields label { color: var(--muted); }
 
   /* discovered hosts */
   .host-row { cursor: pointer; }
@@ -85,8 +94,6 @@
   .scanning { color: var(--muted); }
   .spinner { width: 14px; height: 14px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex: 0 0 auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* address chip */
   .addr { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; color: var(--text); }
 
   /* switches */
@@ -101,94 +108,165 @@
   .btn:active { transform: scale(.98); }
   .btn.primary { background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 80%, var(--accent-2))); border-color: transparent; color: #fff; box-shadow: 0 1px 2px rgba(52,120,246,.35); }
   .btn.primary:hover { filter: brightness(1.06); }
+  .btn.primary.wide { min-width: 200px; padding: 9px 22px; font-size: 14px; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
   .btn:disabled { opacity: .6; cursor: default; }
   .error { color: var(--danger); font-size: 12.5px; }
-  .panel[hidden] { display: none; }
+  .center { text-align: center; }
+
+  /* done step */
+  .next { display: flex; flex-direction: column; gap: 0; }
+  .next .row .num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .kbd { font-family: var(--font); font-size: 11.5px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface-2); }
 </style>
 </head>
 <body>
   <div class="titlebar"></div>
   <main><div class="content">
-    <div class="hero">
-      <img src="icons/icon-256.png" alt="">
-      <h1>Chute</h1>
-      <p>Toss files and text to teammates. Encrypted, gone in a day.</p>
-    </div>
 
-    <div class="seg" id="seg">
-      <div class="thumb"></div>
-      <button type="button" id="segConnect" class="on">Join a chute</button>
-      <button type="button" id="segHost">Host a chute</button>
-    </div>
-
-    <!-- JOIN -->
-    <div class="panel" id="panelConnect">
-      <div class="section-title">On your network</div>
-      <div class="group" id="hostList">
-        <div class="row scanning" id="scanRow"><div class="spinner"></div><div class="grow">Looking for chutes nearby…</div></div>
+    <!-- STEP: welcome (first run only) -->
+    <section class="step" id="stepWelcome" hidden>
+      <div class="hero big">
+        <img src="icons/icon-256.png" alt="">
+        <h1>Welcome to Chute</h1>
+        <p>The quickest way to get a file or a bit of text to someone in the room.</p>
       </div>
-      <div class="group">
-        <div class="field-row">
-          <label class="top" for="serverUrl">Or enter an address</label>
-          <input class="field" type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false" autocomplete="off">
-        </div>
+      <div class="features">
+        <div class="feature"><div class="fi a" data-icon="chute"></div><div><strong>Drop it in, it's everywhere</strong><span>Drag a file onto the menu bar icon, or paste text. Everyone on the same Wi-Fi sees it instantly.</span></div></div>
+        <div class="feature"><div class="fi b" data-icon="lock"></div><div><strong>Locked with a shared passphrase</strong><span>Everything is encrypted before it leaves your device. Without the passphrase it's noise.</span></div></div>
+        <div class="feature"><div class="fi c" data-icon="clock"></div><div><strong>Gone in a day</strong><span>Items delete themselves. Nothing piles up, nothing sticks around.</span></div></div>
       </div>
-    </div>
+    </section>
 
-    <!-- HOST -->
-    <div class="panel" id="panelHost" hidden>
-      <div class="section-title">Passphrase</div>
-      <div class="group">
-        <div class="field-row">
-          <div class="with-btn">
-            <input class="field" type="password" id="pass" placeholder="At least 8 characters" autocomplete="new-password">
-            <button class="icon-btn" type="button" id="togglePass" title="Show passphrase"></button>
+    <!-- STEP: setup -->
+    <section class="step" id="stepSetup" hidden>
+      <div class="hero">
+        <img src="icons/icon-256.png" alt="">
+        <h1 id="setupTitle">Set up your chute</h1>
+        <p id="setupSub">One person hosts it. Everyone else joins with the passphrase.</p>
+      </div>
+
+      <div class="seg" id="seg">
+        <div class="thumb"></div>
+        <button type="button" id="segConnect" class="on">Join a chute</button>
+        <button type="button" id="segHost">Host a chute</button>
+      </div>
+
+      <div class="panel" id="panelConnect">
+        <div class="section-title">On your network</div>
+        <div class="group" id="hostList"></div>
+        <div class="group">
+          <div class="field-row">
+            <label class="top" for="serverUrl">Or enter an address</label>
+            <input class="field" type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false" autocomplete="off">
           </div>
-          <div class="hint" id="passHint">Share it with teammates in person. It is never stored or sent anywhere.</div>
+          <div class="field-row">
+            <label class="top" for="joinPass">Chute passphrase</label>
+            <div class="with-btn">
+              <input class="field" type="password" id="joinPass" placeholder="Ask whoever is hosting" autocomplete="off">
+              <button class="icon-btn" type="button" data-toggle="joinPass" title="Show passphrase"></button>
+            </div>
+            <div class="hint" id="joinPassHint">Stays on this device. You can also type it in the chute window later.</div>
+          </div>
         </div>
       </div>
-      <div class="section-title">Options</div>
+
+      <div class="panel" id="panelHost" hidden>
+        <div class="section-title">Passphrase</div>
+        <div class="group">
+          <div class="field-row">
+            <div class="with-btn">
+              <input class="field" type="password" id="pass" placeholder="At least 8 characters" autocomplete="new-password">
+              <button class="icon-btn" type="button" data-toggle="pass" title="Show passphrase"></button>
+            </div>
+            <div class="hint" id="passHint">Share it with teammates in person. It is never stored or sent anywhere.</div>
+          </div>
+        </div>
+        <div class="section-title">Options</div>
+        <div class="group">
+          <div class="row">
+            <div class="grow"><div class="label">Keep items for</div><div class="sub">Then they're deleted automatically</div></div>
+            <select class="select" id="ttl">
+              <option value="1">1 hour</option><option value="6">6 hours</option><option value="12">12 hours</option>
+              <option value="24" selected>1 day</option><option value="72">3 days</option><option value="168">1 week</option>
+            </select>
+          </div>
+          <div class="row">
+            <div class="grow"><div class="label">Maximum item size</div></div>
+            <select class="select" id="max">
+              <option value="100">100 MB</option><option value="250">250 MB</option><option value="512" selected>512 MB</option>
+              <option value="1024">1 GB</option><option value="2048">2 GB</option>
+            </select>
+          </div>
+          <div class="row">
+            <div class="grow"><div class="label">Port</div><div class="sub">Only change this if another app uses it</div></div>
+            <input class="field mini" type="text" inputmode="numeric" pattern="[0-9]*" id="port" value="8443" maxlength="5">
+          </div>
+        </div>
+        <div id="hostUrls" hidden>
+          <div class="section-title">Your address</div>
+          <div class="group">
+            <div class="row">
+              <div class="grow"><div class="addr" id="primaryUrl"></div><div class="sub">Teammates pick this computer from their list, or open this address in a browser.</div></div>
+              <button class="icon-btn" type="button" id="copyUrl" title="Copy addresses"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Behaviour</div>
       <div class="group">
-        <div class="row">
-          <div class="grow"><div class="label">Keep items for</div><div class="sub">Then they're deleted automatically</div></div>
-          <select class="select" id="ttl">
-            <option value="1">1 hour</option><option value="6">6 hours</option><option value="12">12 hours</option>
-            <option value="24" selected>1 day</option><option value="72">3 days</option><option value="168">1 week</option>
-          </select>
-        </div>
-        <div class="row">
-          <div class="grow"><div class="label">Maximum item size</div></div>
-          <select class="select" id="max">
-            <option value="100">100 MB</option><option value="250">250 MB</option><option value="512" selected>512 MB</option>
-            <option value="1024">1 GB</option><option value="2048">2 GB</option>
-          </select>
-        </div>
-        <div class="row">
-          <div class="grow"><div class="label">Port</div><div class="sub">Only change this if another app uses it</div></div>
-          <input class="field mini" type="text" inputmode="numeric" pattern="[0-9]*" id="port" value="8443" maxlength="5">
+        <label class="row"><div class="grow"><div class="label">Notify me when something arrives</div></div><input type="checkbox" class="switch" id="notifications" checked></label>
+        <label class="row"><div class="grow"><div class="label">Launch at login</div><div class="sub" id="loginHint" hidden>Available in the installed app</div></div><input type="checkbox" class="switch" id="launchAtLogin"></label>
+      </div>
+
+      <div id="dangerHost" hidden>
+        <div class="section-title">This chute</div>
+        <div class="group">
+          <div class="row"><div class="grow"><div class="label">Empty the chute</div><div class="sub">Deletes everything in it now. Keeps hosting.</div></div><button class="btn danger" type="button" id="emptyBtn">Empty…</button></div>
+          <div class="row"><div class="grow"><div class="label">Stop hosting</div><div class="sub">Takes the chute off the network and deletes everything in it.</div></div><button class="btn danger" type="button" id="stopBtn">Stop…</button></div>
         </div>
       </div>
-      <div id="hostUrls" hidden>
+      <div id="dangerJoin" hidden>
+        <div class="section-title">This chute</div>
+        <div class="group">
+          <div class="row"><div class="grow"><div class="label">Leave this chute</div><div class="sub">Forgets the address and passphrase on this device. Nothing is deleted for others.</div></div><button class="btn danger" type="button" id="leaveBtn">Leave…</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP: done -->
+    <section class="step" id="stepDone" hidden>
+      <div class="hero">
+        <img src="icons/icon-256.png" alt="">
+        <h1 id="doneTitle">You're in</h1>
+        <p id="doneSub">Chute lives in your menu bar now.</p>
+      </div>
+      <div class="section-title">What to do next</div>
+      <div class="group next">
+        <div class="row"><div class="num">1</div><div class="grow"><div class="label" id="tip1">Click the Chute icon in the menu bar to open it</div><div class="sub">It stays out of the way until you need it.</div></div></div>
+        <div class="row"><div class="num">2</div><div class="grow"><div class="label" id="tip2">Drag a file onto the icon, or paste into the window</div><div class="sub">Text, screenshots, PDFs, anything. Press <span class="kbd">Esc</span> to close the window.</div></div></div>
+        <div class="row"><div class="num">3</div><div class="grow"><div class="label" id="tip3">Tell your teammates the passphrase</div><div class="sub" id="tip3sub">They install Chute, pick this computer from the list, and type it once.</div></div></div>
+      </div>
+      <div id="doneUrls" hidden>
         <div class="section-title">Your address</div>
         <div class="group">
           <div class="row">
-            <div class="grow"><div class="addr" id="primaryUrl"></div><div class="sub">Teammates pick this computer from their list, or open this address in a browser.</div></div>
-            <button class="icon-btn" type="button" id="copyUrl" title="Copy addresses"></button>
+            <div class="grow"><div class="addr" id="donePrimaryUrl"></div><div class="sub">For anyone joining from a browser instead of the app.</div></div>
+            <button class="icon-btn" type="button" id="doneCopyUrl" title="Copy addresses"></button>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="section-title">Behaviour</div>
-    <div class="group">
-      <label class="row"><div class="grow"><div class="label">Notify me when something arrives</div></div><input type="checkbox" class="switch" id="notifications" checked></label>
-      <label class="row"><div class="grow"><div class="label">Launch at login</div><div class="sub" id="loginHint" hidden>Available in the installed app</div></div><input type="checkbox" class="switch" id="launchAtLogin"></label>
-    </div>
   </div></main>
   <div class="footer">
     <span class="error" id="error"></span>
+    <button class="btn" id="back" type="button" hidden>Back</button>
+    <span class="spacer"></span>
     <button class="btn" id="cancel" type="button">Cancel</button>
-    <button class="btn primary" id="save" type="button">Open Chute</button>
+    <button class="btn primary" id="primary" type="button">Continue</button>
   </div>
   <script src="settings.js"></script>
 </body>

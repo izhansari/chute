@@ -42,7 +42,12 @@ Or run it straight from source while developing:
 npm run desktop
 ```
 
-First launch opens Settings:
+First launch walks you through it: a short welcome, then one screen to either host a
+chute or join one (with the passphrase), then a "you're in" page. The passphrase you
+enter there also unlocks the chute window, so you type it once.
+
+Later, the gear button in the window (or "Settings…" in the tray menu) opens the same
+screen:
 
 - **Host the chute on this computer**: choose the shared passphrase. The chute runs in the
   background whenever this computer is on and announces itself on the network.
@@ -67,6 +72,19 @@ things in from Finder or Explorer. Everything else is the same web UI described 
 - **Launch at login** from the tray menu, so it is always there.
 - The host's self-signed certificate is remembered on first connection (trust on first
   use). If it ever changes, you are asked before continuing.
+
+### Locking, leaving, and closing a chute
+
+- **Lock** (padlock in the window) only forgets the passphrase on *this device*. The chute
+  keeps running and nothing is deleted. Unlock again by typing the passphrase.
+- **Quit Chute** closes the app. If you are the host, the chute is offline until you open
+  Chute again; the items are still there when it comes back (until they expire).
+- **Empty the chute** (host, tray menu or Settings) deletes everything in it right now for
+  everyone, and keeps hosting.
+- **Stop hosting** (host, tray menu or Settings) takes the chute off the network and deletes
+  everything in it. Teammates can no longer connect.
+- **Leave this chute** (joiner, tray menu or Settings) forgets the address and passphrase
+  on this device. Nothing is deleted for anyone else.
 
 The installers are unsigned. On first open, macOS will say the app is from an
 unidentified developer: right-click the app and choose **Open**. Windows SmartScreen

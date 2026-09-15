@@ -504,6 +504,7 @@
   if (desktop) {
     document.documentElement.classList.add('desktop', IS_MAC ? 'mac' : 'win');
     el.settingsBtn.hidden = false; el.pinBtn.hidden = false;
+    const hint = document.getElementById('gateDesktopHint'); if (hint) hint.hidden = false;
     el.settingsBtn.addEventListener('click', () => desktop.openSettings());
     el.pinBtn.addEventListener('click', async () => { const pinned = await desktop.togglePinned(); el.pinBtn.classList.toggle('active', pinned); });
     desktop.info().then((info) => { state.info = info; el.pinBtn.classList.toggle('active', !!info.pinned); if (state.token) showApp(); });
@@ -514,8 +515,11 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') desktop.hide(); });
   }
 
-  let saved = null;
-  try { saved = localStorage.getItem('chutePass') || sessionStorage.getItem('chutePass'); } catch { /* ignore */ }
-  if (saved) { el.remember.checked = !!localStorage.getItem('chutePass'); unlock(saved, el.remember.checked); }
-  else el.pass.focus();
+  (async () => {
+    let saved = null;
+    try { saved = localStorage.getItem('chutePass') || sessionStorage.getItem('chutePass'); } catch { /* ignore */ }
+    if (!saved && desktop && desktop.takePassphrase) saved = await desktop.takePassphrase(); // just set up in Settings
+    if (saved) { el.remember.checked = desktop ? true : !!localStorage.getItem('chutePass'); unlock(saved, el.remember.checked); }
+    else el.pass.focus();
+  })();
 })();

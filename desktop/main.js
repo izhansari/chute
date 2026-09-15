@@ -36,6 +36,7 @@ let mdnsService = null;
 let quitting = false;
 let unread = 0;
 let nativeDialogOpen = false;
+let pendingPassphrase = null; // handed to the page once after setup so it doesn't ask again
 
 // ---------- settings ----------
 function loadSettings() {
@@ -276,9 +277,12 @@ function buildTrayMenu() {
     ...(hosting ? [
       { label: 'Hosting at ' + urls.lan[0], enabled: false },
       { label: 'Copy address for teammates', click: () => { clipboard.writeText(urls.lan.join('\n')); notify('Address copied', urls.lan[0]); } },
+      { label: 'Empty the chute…', click: async () => { if (await confirm(null, 'Empty the chute?', 'Everything in it is deleted for everyone. The chute keeps running.', 'Empty')) await emptyChute(); } },
+      { label: 'Stop hosting…', click: async () => { if (await confirm(null, 'Stop hosting this chute?', 'It goes off the network and everything in it is deleted. Teammates will no longer be able to connect.', 'Stop hosting')) { await stopHosting(); openSettings(); } } },
       { type: 'separator' },
     ] : settings.mode === 'connect' ? [
-      { label: 'Connected to ' + settings.serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''), enabled: false },
+      { label: 'Joined ' + settings.serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''), enabled: false },
+      { label: 'Leave this chute…', click: async () => { if (await confirm(null, 'Leave this chute?', 'This device forgets the address and passphrase. Nothing is deleted for anyone else.', 'Leave')) { await leaveChute(); openSettings(); } } },
       { type: 'separator' },
     ] : []),
     { label: 'Keep window open', type: 'checkbox', checked: settings.pinned, click: (mi) => { settings.pinned = mi.checked; saveSettings(); if (win) win.webContents.send('pinned', settings.pinned); } },
@@ -361,6 +365,7 @@ ipcMain.handle('toggle-pinned', () => { settings.pinned = !settings.pinned; save
 ipcMain.handle('thumbnail', (e, f) => thumbnailFor(f && f.name, f && f.bytes));
 ipcMain.handle('quick-look', (e, f) => quickLook(f && f.name, f && f.bytes));
 ipcMain.handle('app-info', () => ({ platform: process.platform, version: app.getVersion(), mode: settings.mode, pinned: settings.pinned }));
+ipcMain.handle('take-passphrase', () => { const p = pendingPassphrase; pendingPassphrase = null; return p; });
 
 // ---------- IPC (settings window) ----------
 ipcMain.handle('settings:get', () => {
@@ -370,15 +375,17 @@ ipcMain.handle('settings:get', () => {
     hostConfigured: !!cfg,
     host: cfg ? { port: cfg.port, ttlHours: cfg.ttlHours, maxMB: cfg.maxMB } : { port: 8443, ttlHours: 24, maxMB: 512 },
     hostUrls: drop ? drop.urls() : null, hostname: os.hostname().split('.')[0], canLoginItem: app.isPackaged,
+    firstRun: !settings.mode,
   };
 });
 ipcMain.handle('settings:save', async (e, s) => {
   try {
     settings.notifications = !!s.notifications;
     settings.launchAtLogin = !!s.launchAtLogin;
+    if (s.passphrase) pendingPassphrase = String(s.passphrase);
     if (s.mode === 'connect') {
       const url = normalizeUrl(s.serverUrl);
-      if (!url) throw new Error('Enter the address of the chute to connect to.');
+      if (!url) throw new Error('Pick a chute from the list or enter its address.');
       await stopHost();
       settings.mode = 'connect'; settings.serverUrl = url;
     } else if (s.mode === 'host') {
@@ -397,12 +404,54 @@ ipcMain.handle('settings:save', async (e, s) => {
     saveSettings();
     applyLoginItem();
     refreshTray();
-    if (win) win.loadURL(targetUrl());
-    showMain();
+    if (!win) createMainWindow();
+    win.loadURL(targetUrl()); // load now so the popover is ready (and unlocked) when opened
     return { ok: true, hostUrls: drop ? drop.urls() : null };
   } catch (err) { return { ok: false, error: err.message }; }
 });
 ipcMain.on('settings:close', () => { if (settingsWin) settingsWin.close(); });
+ipcMain.on('settings:finish', () => { if (settingsWin) settingsWin.close(); showMain(); });
+
+async function confirm(parent, message, detail, button) {
+  const { response } = await dialog.showMessageBox(parent || undefined, { type: 'warning', buttons: ['Cancel', button], defaultId: 0, cancelId: 0, message, detail });
+  return response === 1;
+}
+async function forgetPageState() {
+  try { await session.defaultSession.clearStorageData({ storages: ['localstorage', 'cookies', 'cachestorage'] }); } catch { /* ignore */ }
+}
+async function emptyChute() {
+  const dir = path.join(HOST_DIR, 'data');
+  try { for (const f of fs.readdirSync(dir)) fs.unlinkSync(path.join(dir, f)); } catch { /* ignore */ }
+}
+async function stopHosting() {
+  await stopHost();
+  cleanDir(HOST_DIR);
+  settings.mode = null; saveSettings();
+  await forgetPageState();
+  if (win) { win.hide(); win.loadURL('about:blank'); }
+  refreshTray();
+}
+async function leaveChute() {
+  settings.mode = null; settings.serverUrl = ''; saveSettings();
+  await forgetPageState();
+  if (win) { win.hide(); win.loadURL('about:blank'); }
+  refreshTray();
+}
+ipcMain.handle('settings:host-action', async (e, what) => {
+  if (what === 'empty') {
+    if (!await confirm(settingsWin, 'Empty the chute?', 'Everything in it is deleted for everyone. The chute keeps running.', 'Empty')) return false;
+    await emptyChute(); return true;
+  }
+  if (what === 'stop') {
+    if (!await confirm(settingsWin, 'Stop hosting this chute?', 'It goes off the network and everything in it is deleted. Teammates will no longer be able to connect.', 'Stop hosting')) return false;
+    await stopHosting(); return true;
+  }
+  if (what === 'leave') {
+    if (!await confirm(settingsWin, 'Leave this chute?', 'This device forgets the address and passphrase. Nothing is deleted for anyone else.', 'Leave')) return false;
+    await leaveChute(); return true;
+  }
+  return false;
+});
 ipcMain.on('settings:open-external', (e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
 ipcMain.handle('settings:copy', (e, text) => { clipboard.writeText(String(text).slice(0, 4096)); return true; });
 ipcMain.on('settings:resize', (e, h) => {
@@ -460,29 +509,34 @@ async function runSelfTest() {
   const results = {};
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   try {
-    writeConfig({ dir: HOST_DIR, passphrase: 'test-passphrase-123', port: 8543 });
-    settings.mode = 'host'; settings.pinned = true; saveSettings();
-    await startHost();
-    results.urls = drop.urls();
-    refreshTray();
+    settings.pinned = true; saveSettings();
 
+    // Onboarding screenshots: welcome (first run), setup, done
+    settings.mode = null; saveSettings();
     openSettings();
     await new Promise((r) => settingsWin.webContents.once('did-finish-load', r));
-    await wait(1500);
-    fs.writeFileSync(path.join(out, 'settings-host.png'), (await settingsWin.webContents.capturePage()).toPNG());
-    await settingsWin.webContents.executeJavaScript('document.getElementById("segConnect").click(); true');
-    await wait(700);
-    fs.writeFileSync(path.join(out, 'settings-join.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    await wait(900);
+    fs.writeFileSync(path.join(out, 'onboard-welcome.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    await settingsWin.webContents.executeJavaScript('document.getElementById("primary").click(); true');
+    await wait(900);
+    fs.writeFileSync(path.join(out, 'onboard-join.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    await settingsWin.webContents.executeJavaScript('document.getElementById("segHost").click(); document.getElementById("pass").value = "test-passphrase-123"; document.getElementById("port").value = "8543"; true');
+    await wait(500);
+    fs.writeFileSync(path.join(out, 'onboard-host.png'), (await settingsWin.webContents.capturePage()).toPNG());
+    await settingsWin.webContents.executeJavaScript('document.getElementById("primary").click(); true'); // saves: writes config, starts host, hands passphrase to the page
+    await wait(3000);
+    fs.writeFileSync(path.join(out, 'onboard-done.png'), (await settingsWin.webContents.capturePage()).toPNG());
     settingsWin.close();
+    results.modeAfterSetup = settings.mode;
+    results.urls = drop ? drop.urls() : null;
 
-    createMainWindow();
-    win.loadURL(targetUrl());
-    await new Promise((r) => win.webContents.once('did-finish-load', r));
+    // The popover must come up already unlocked (no second passphrase prompt)
+    if (!win) createMainWindow();
+    await wait(4000);
     positionNearTray(); win.show();
-    await wait(800);
-    fs.writeFileSync(path.join(out, 'main-locked.png'), (await win.webContents.capturePage()).toPNG());
     results.bridge = await win.webContents.executeJavaScript('typeof window.chute === "object" && typeof window.chute.notify === "function"');
-    await win.webContents.executeJavaScript(`(async () => { document.getElementById('passInput').value = 'test-passphrase-123'; document.getElementById('gateForm').requestSubmit(); await new Promise(r => setTimeout(r, 3500)); return document.getElementById('gate').hidden; })()`);
+    results.autoUnlocked = await win.webContents.executeJavaScript('document.getElementById("gate").hidden && !document.getElementById("app").hidden');
+    fs.writeFileSync(path.join(out, 'main-locked.png'), (await win.webContents.capturePage()).toPNG());
     win.webContents.send('drop-text', 'Standup moved to 3pm, room B.\nBring the USB-C adapter.');
     const pdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 400]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 120>>stream\nBT /F1 28 Tf 30 340 Td (Q3 Roadmap) Tj ET\n0.2 0.47 0.96 rg 30 60 240 240 re f\n1 g BT /F1 16 Tf 60 170 Td (Chute) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>');
     win.webContents.send('drop-files', [{ name: 'app-icon.png', type: 'image/png', bytes: fs.readFileSync(path.join(ICONS, 'icon-256.png')) }, { name: 'design-assets.zip', type: 'application/zip', bytes: Buffer.alloc(2 * 1024 * 1024) }, { name: 'Q3 roadmap.pdf', type: 'application/pdf', bytes: pdf }]);

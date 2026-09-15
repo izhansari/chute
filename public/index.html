@@ -19,7 +19,7 @@
     </div>
     <div class="top-right">
       <button class="icon-btn" id="pinBtn" title="Keep open while you drag things in" hidden></button>
-      <button class="icon-btn" id="lockBtn" title="Lock and forget the passphrase on this device" hidden></button>
+      <button class="icon-btn" id="lockBtn" title="Lock this device: forgets the passphrase here. The chute keeps running for everyone else." hidden></button>
       <button class="icon-btn" id="settingsBtn" title="Settings" hidden></button>
     </div>
   </header>
@@ -34,6 +34,7 @@
       <div class="gate-icon" id="gateIcon"></div>
       <h2>Enter the shared passphrase</h2>
       <p class="muted">It never leaves this device. It unlocks the chute and decrypts what's inside.</p>
+      <p class="muted small" id="gateDesktopHint" hidden>Locked on this device only. The chute itself is still running.</p>
       <form id="gateForm" autocomplete="off">
         <input id="passInput" type="password" placeholder="Passphrase" autocomplete="current-password" required minlength="8">
         <label class="check"><input type="checkbox" id="rememberBox"> Remember on this device</label>
