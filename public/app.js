@@ -269,7 +269,8 @@
     if (n < 1024) return n + ' B';
     if (n < 1048576) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
     if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
-    return (n / 1073741824).toFixed(2) + ' GB';
+    const gb = n / 1073741824;
+    return (Number.isInteger(gb) ? gb : gb.toFixed(gb < 10 ? 2 : 1)) + ' GB';
   }
   function fmtAgo(ts) {
     const s = Math.max(0, (Date.now() - state.clockOffset - ts) / 1000);
