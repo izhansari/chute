@@ -107,17 +107,25 @@ You need the paid Apple Developer Program and a **Developer ID Application** cer
 installed in your keychain (Xcode → Settings → Accounts → Manage Certificates → + →
 Developer ID Application). Then:
 
+Store notarization credentials in your keychain once. The team ID is the one in
+parentheses on the *Developer ID Application* line of `security find-identity -v -p codesigning`
+(not your personal development team). The password is an app-specific password from
+account.apple.com → Sign-In and Security; it is prompted for, never put on the command line.
+
 ```bash
-export APPLE_ID="you@example.com"
-export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"   # appleid.apple.com → App-Specific Passwords
-export APPLE_TEAM_ID="XXXXXXXXXX"
-npm run dist:signed
+xcrun notarytool store-credentials chute --apple-id "you@example.com" --team-id XXXXXXXXXX
+```
+
+Then build:
+
+```bash
+APPLE_KEYCHAIN_PROFILE=chute npm run dist:signed
 ```
 
 The build is already configured for the hardened runtime, entitlements, and notarization;
-electron-builder signs with the Developer ID it finds and submits the DMG to Apple (a few
-minutes). The resulting DMG opens on any Mac without warnings. For Windows, a code-signing
-certificate can be supplied the same way via `CSC_LINK` / `CSC_KEY_PASSWORD`.
+electron-builder signs with the Developer ID it finds and submits the app to Apple (a few
+minutes), then staples the ticket. The resulting DMG opens on any Mac without warnings.
+For Windows, a code-signing certificate can be supplied via `CSC_LINK` / `CSC_KEY_PASSWORD`.
 
 ## Plain server: setup (once, on the machine that will host the chute)
 
