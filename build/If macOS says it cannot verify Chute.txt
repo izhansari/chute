@@ -1,0 +1,18 @@
+If macOS says "Chute Not Opened" / "Apple could not verify Chute is free of malware"
+======================================================================================
+
+That message appears because this copy of Chute is not yet signed with an Apple
+Developer ID. Nothing is wrong with the app. To open it anyway:
+
+  1. Click "Done" (not "Move to Trash").
+  2. Open System Settings > Privacy & Security.
+  3. Scroll down to the Security section. You will see:
+        "Chute" was blocked to protect your Mac.     [ Open Anyway ]
+  4. Click "Open Anyway", enter your password, then click "Open" in the next dialog.
+
+You only have to do this once.
+
+Terminal alternative (after dragging Chute to Applications):
+    xattr -dr com.apple.quarantine /Applications/Chute.app
+
+Windows: SmartScreen shows "Windows protected your PC". Click "More info", then "Run anyway".

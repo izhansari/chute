@@ -9,9 +9,10 @@
     "start": "node server.js",
     "desktop": "electron .",
     "icons": "node desktop/make-icons.js",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win"
+    "dist": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --win",
+    "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "dist:win": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
+    "dist:signed": "electron-builder --mac --win"
   },
   "engines": {
     "node": ">=18"
@@ -43,13 +44,25 @@
       "category": "public.app-category.utilities",
       "icon": "desktop/icons/icon.png",
       "target": [{ "target": "dmg", "arch": ["universal"] }],
-      "extendInfo": { "LSUIElement": true }
+      "extendInfo": { "LSUIElement": true },
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "icon": "desktop/icons/icon.png",
       "target": [{ "target": "nsis", "arch": ["x64"] }]
     },
-    "dmg": { "title": "Chute", "contents": [{ "x": 130, "y": 170 }, { "x": 410, "y": 170, "type": "link", "path": "/Applications" }] },
+    "dmg": {
+      "title": "Chute",
+      "contents": [
+        { "x": 130, "y": 150 },
+        { "x": 410, "y": 150, "type": "link", "path": "/Applications" },
+        { "x": 270, "y": 300, "type": "file", "path": "build/If macOS says it cannot verify Chute.txt" }
+      ]
+    },
     "nsis": { "oneClick": true, "perMachine": false, "runAfterFinish": true },
     "linux": { "target": ["AppImage"], "icon": "desktop/icons/icon.png", "category": "Utility" }
   }

@@ -88,9 +88,36 @@ things in from Finder or Explorer. Everything else is the same web UI described 
 - **Leave this chute** (joiner, tray menu or Settings) forgets the address and passphrase
   on this device. Nothing is deleted for anyone else.
 
-The installers are unsigned. On first open, macOS will say the app is from an
-unidentified developer: right-click the app and choose **Open**. Windows SmartScreen
-shows "More info → Run anyway".
+### "Apple could not verify Chute is free of malware"
+
+`npm run dist` makes **unsigned** installers. On another person's Mac, Gatekeeper blocks
+the first open with that message (and on recent macOS the old right-click → Open trick
+no longer works). The DMG includes a text file with these steps:
+
+1. Click **Done**, not Move to Trash.
+2. System Settings → **Privacy & Security** → scroll to the bottom.
+3. Next to *"Chute" was blocked to protect your Mac*, click **Open Anyway**, then **Open**.
+
+Once per machine. Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Chute.app`.
+Windows SmartScreen: "More info → Run anyway".
+
+### Signing and notarizing (removes the warning for everyone)
+
+You need the paid Apple Developer Program and a **Developer ID Application** certificate
+installed in your keychain (Xcode → Settings → Accounts → Manage Certificates → + →
+Developer ID Application). Then:
+
+```bash
+export APPLE_ID="you@example.com"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"   # appleid.apple.com → App-Specific Passwords
+export APPLE_TEAM_ID="XXXXXXXXXX"
+npm run dist:signed
+```
+
+The build is already configured for the hardened runtime, entitlements, and notarization;
+electron-builder signs with the Developer ID it finds and submits the DMG to Apple (a few
+minutes). The resulting DMG opens on any Mac without warnings. For Windows, a code-signing
+certificate can be supplied the same way via `CSC_LINK` / `CSC_KEY_PASSWORD`.
 
 ## Plain server: setup (once, on the machine that will host the chute)
 
