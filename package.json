@@ -1,6 +1,6 @@
 {
   "name": "chute",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Chute: toss files and text to people on your network. End-to-end encrypted, gone in a day.",
   "private": true,
   "main": "desktop/main.js",

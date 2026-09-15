@@ -6,8 +6,8 @@ it pops out on everyone else's. End-to-end encrypted, gone in a day.
 ## Download
 
 - **Mac** (Intel and Apple Silicon, signed and notarized):
-  [Chute-1.0.0-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.0/Chute-1.0.0-mac-universal.dmg)
-- **Windows**: [Chute-1.0.0-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.0/Chute-1.0.0-win-x64.exe)
+  [Chute-1.0.1-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.1/Chute-1.0.1-mac-universal.dmg)
+- **Windows**: [Chute-1.0.1-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.1/Chute-1.0.1-win-x64.exe)
   (unsigned: SmartScreen shows "More info → Run anyway" once)
 
 All releases: https://github.com/izhansari/chute/releases
@@ -92,14 +92,12 @@ things in from Finder or Explorer. Everything else is the same web UI described 
 
 ### Locking, leaving, and closing a chute
 
-- **Close the window** with the × (or Esc, or click anywhere else). Nothing happens to the
-  chute; it's just out of the way.
-- **Lock this device** (tray menu, or Settings) only forgets the passphrase on *this device*.
-  The chute keeps running and nothing is deleted. Unlock again by typing the passphrase.
+- **Close the window** by clicking the menu bar icon again, pressing Esc, or clicking
+  anywhere else. Nothing happens to the chute; it's just out of the way.
 - **Quit Chute** closes the app. If you are the host, the chute is offline until you open
   Chute again; the items are still there when it comes back (until they expire).
-- **Stop hosting** (the power button in the window, the tray menu, or Settings) takes the
-  chute off the network. One dialog asks whether to keep the items or delete everything.
+- **Pause hosting** (click the green "Hosting" pill or the power button in the window, or
+  use the tray menu or Settings) takes the chute off the network. One dialog asks whether to keep the items or delete everything.
   The chute is paused, not gone: **Start hosting again** brings it back with the same
   passphrase and, if you kept them, the same items.
 - **Empty the chute** (host, tray menu or Settings) deletes everything in it right now for
@@ -110,6 +108,12 @@ things in from Finder or Explorer. Everything else is the same web UI described 
   on this device. Nothing is deleted for anyone else.
 - Settings shows the connection: who's hosting and their address, online/offline, the
   host's expiry and size limits, and for hosts, how many devices are connected.
+- Settings can **show the passphrase** (eye button) and **change it**. Changing it clears
+  the chute, since items are encrypted with the old one. The passphrase is kept on the
+  device encrypted with the OS keychain so it can be shown later.
+- Hosts set a **maximum chute size** (1 GB to 20 GB, or no limit; default 10 GB). Uploads
+  that would exceed it are refused with "the chute is full", and the window shows
+  "used of total" next to the item count.
 
 ### "Apple could not verify Chute is free of malware"
 

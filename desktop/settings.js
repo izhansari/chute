@@ -34,6 +34,21 @@
     });
   }
   $('#copyUrl').innerHTML = svg('copy'); $('#doneCopyUrl').innerHTML = svg('copy');
+  $('#revealPass').innerHTML = svg('eye'); $('#revealJoinPass').innerHTML = svg('eye');
+  // reveal the saved passphrase on demand; hide it again on the second click
+  function wireReveal(btn, label) {
+    let shown = false;
+    btn.addEventListener('click', async () => {
+      shown = !shown;
+      label.textContent = shown ? ((await api.revealPassphrase()) || '(not saved on this device)') : '••••••••••';
+      btn.innerHTML = svg(shown ? 'eyeOff' : 'eye');
+    });
+  }
+  wireReveal($('#revealPass'), $('#currentPass'));
+  wireReveal($('#revealJoinPass'), $('#joinCurrentPass'));
+  $('#changePassBtn').addEventListener('click', () => { $('#rowNewPass').hidden = false; $('#changePassBtn').disabled = true; $('#pass').focus(); fit(); });
+  $('#changeJoinPassBtn').addEventListener('click', () => { $('#rowJoinNewPass').hidden = false; $('#changeJoinPassBtn').disabled = true; $('#joinPass').focus(); fit(); });
+  document.querySelector('details.adv').addEventListener('toggle', (e) => { fit(); if (e.target.open) setTimeout(() => e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80); });
 
   // ---------- window sizing ----------
   let fitTimer = null;
@@ -131,16 +146,20 @@
     };
     pick($('#ttl'), s.host.ttlHours, `${s.host.ttlHours} hours`);
     pick($('#max'), s.host.maxMB, `${s.host.maxMB} MB`);
+    pick($('#maxTotal'), s.host.maxTotalMB || 0, `${Math.round((s.host.maxTotalMB || 0) / 1024)} GB`);
     $('#port').value = s.host.port;
     $('#notifications').checked = !!s.notifications;
     $('#launchAtLogin').checked = !!s.launchAtLogin;
     $('#doneLaunch').checked = !!s.launchAtLogin;
     if (!s.canLoginItem) { $('#launchAtLogin').disabled = true; $('#loginHint').hidden = false; $('#doneLaunch').disabled = true; $('#doneLoginHint').textContent = 'Available in the installed app.'; }
     if (s.hostConfigured && s.mode === 'host') {
-      $('#pass').placeholder = 'Leave blank to keep the current passphrase';
-      $('#passHint').textContent = 'Entering a new passphrase clears everything currently in the chute.';
+      $('#rowCurrentPass').hidden = false; $('#rowNewPass').hidden = true; $('#passLabel').hidden = false;
+      $('#passHint').textContent = 'Changing the passphrase clears everything in the chute. Teammates will need the new one.';
     }
-    if (s.mode === 'connect') $('#joinPass').placeholder = 'Leave blank to keep the current passphrase';
+    if (s.mode === 'connect' && !firstRun) {
+      $('#rowJoinCurrentPass').hidden = false; $('#rowJoinNewPass').hidden = true; $('#joinPassLabel').textContent = 'New passphrase';
+      $('#joinPassHint').textContent = 'Use this if the host changed the passphrase.';
+    }
     $('#dangerHost').hidden = !(s.mode === 'host' && s.hostConfigured);
     $('#dangerJoin').hidden = s.mode !== 'connect';
     $('#rowStop').hidden = !!s.hostPaused; $('#rowResume').hidden = !s.hostPaused;
@@ -182,7 +201,7 @@
     const r = await api.save({
       mode, serverUrl: $('#serverUrl').value,
       passphrase: mode === 'host' ? $('#pass').value : $('#joinPass').value,
-      ttlHours: Number($('#ttl').value), maxMB: Number($('#max').value), port: Number($('#port').value),
+      ttlHours: Number($('#ttl').value), maxMB: Number($('#max').value), maxTotalMB: Number($('#maxTotal').value), port: Number($('#port').value),
       notifications: $('#notifications').checked, launchAtLogin: firstRun ? $('#doneLaunch').checked : $('#launchAtLogin').checked,
     });
     $('#primary').disabled = false;
@@ -200,7 +219,6 @@
   });
   $('#doneLaunch').addEventListener('change', () => api.update({ launchAtLogin: $('#doneLaunch').checked }));
 
-  $('#lockBtn').addEventListener('click', async () => { await api.lockDevice(); api.close(); });
   $('#emptyBtn').addEventListener('click', async () => { if (await api.hostAction('empty')) $('#error').textContent = ''; });
   $('#stopBtn').addEventListener('click', async () => { if (await api.hostAction('stop')) location.reload(); });
   $('#resumeBtn').addEventListener('click', async () => { if (await api.hostAction('resume')) location.reload(); });

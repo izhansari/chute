@@ -7,7 +7,7 @@
  *  - native notifications + unread badge, drop files on the menu bar icon (macOS),
  *    send clipboard from the tray menu, downloads to ~/Downloads, launch at login
  */
-const { app, BrowserWindow, Tray, Menu, Notification, nativeImage, ipcMain, shell, screen, dialog, clipboard, session, nativeTheme } = require('electron');
+const { app, BrowserWindow, Tray, Menu, Notification, nativeImage, ipcMain, shell, screen, dialog, clipboard, session, nativeTheme, safeStorage } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -45,11 +45,17 @@ const staged = new Map();     // item id -> { path, icon } files staged on disk 
 
 // ---------- settings ----------
 function loadSettings() {
-  const defaults = { mode: null, serverUrl: '', launchAtLogin: false, notifications: true, pinned: false, pins: {}, downloadDir: '', hostPaused: false };
+  const defaults = { mode: null, serverUrl: '', launchAtLogin: false, notifications: true, pinned: false, pins: {}, downloadDir: '', hostPaused: false, passEnc: '' };
   try { return Object.assign(defaults, JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'))); } catch { return defaults; }
 }
 function saveSettings() { fs.mkdirSync(USER_DATA, { recursive: true }); fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2)); }
 function hostConfig() { try { return JSON.parse(fs.readFileSync(path.join(HOST_DIR, 'config.json'), 'utf8')); } catch { return null; } }
+function rememberPassphrase(p) {
+  try { settings.passEnc = p && safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(String(p)).toString('base64') : ''; } catch { settings.passEnc = ''; }
+}
+function recallPassphrase() {
+  try { return settings.passEnc && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(settings.passEnc, 'base64')) : null; } catch { return null; }
+}
 function normalizeUrl(input) {
   let s = String(input || '').trim();
   if (!s) return '';
@@ -146,7 +152,7 @@ function createMainWindow() {
     skipTaskbar: true, alwaysOnTop: true, title: 'Chute', icon: path.join(ICONS, 'icon-256.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
   };
-  if (IS_MAC) Object.assign(common, { transparent: true, vibrancy: 'popover', visualEffectState: 'active', hasShadow: true, roundedCorners: true });
+  if (IS_MAC) Object.assign(common, { transparent: true, backgroundColor: '#00000000', vibrancy: 'popover', visualEffectState: 'active', hasShadow: true, roundedCorners: true });
   else if (IS_WIN) Object.assign(common, { backgroundMaterial: 'acrylic', roundedCorners: true, backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f2f2f7' });
   else Object.assign(common, { backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f2f2f7' });
 
@@ -191,15 +197,36 @@ function positionNearTray() {
     win.setPosition(x, y, false);
   } catch { /* keep current position */ }
 }
+let loading = null; // promise for an in-flight navigation of the popover
+function loadInto(url) {
+  loading = new Promise((resolve) => {
+    const done = () => { loading = null; resolve(); };
+    win.webContents.once('did-finish-load', done);
+    win.webContents.once('did-fail-load', done);
+    win.loadURL(url);
+  });
+  return loading;
+}
 function ensureLoaded() {
   if (!win) createMainWindow();
   const t = targetUrl();
   if (!t) return false;
-  if (!win.webContents.getURL().startsWith(t)) win.loadURL(t);
+  if (!win.webContents.getURL().startsWith(t)) loadInto(t);
   return true;
 }
-function showMain() {
+// Navigate the popover without a white flash: hide first, show again once the new page has painted.
+async function navigatePopover() {
+  if (!win) createMainWindow();
+  const t = targetUrl();
+  if (!t) return;
+  const wasVisible = win.isVisible();
+  if (wasVisible) win.hide();
+  await loadInto(t);
+  if (wasVisible) { positionNearTray(); win.show(); win.focus(); }
+}
+async function showMain() {
   if (!ensureLoaded()) return openSettings();
+  if (loading) await Promise.race([loading, new Promise((r) => setTimeout(r, 2500))]); // let the page paint before showing
   positionNearTray();
   win.show();
   win.focus();
@@ -307,7 +334,6 @@ function buildTrayMenu() {
       { label: 'Leave this chute…', click: async () => { if (await confirm(null, 'Leave this chute?', 'This device forgets the address and passphrase. Nothing is deleted for anyone else.', 'Leave')) { await leaveChute(); openSettings(); } } },
       { type: 'separator' },
     ] : []),
-    ...(settings.mode ? [{ label: 'Lock this device', click: lockDevice }, { type: 'separator' }] : []),
     { label: 'Keep window open', type: 'checkbox', checked: settings.pinned, click: (mi) => { settings.pinned = mi.checked; saveSettings(); if (win) win.webContents.send('pinned', settings.pinned); } },
     { label: 'Notifications', type: 'checkbox', checked: settings.notifications, click: (mi) => { settings.notifications = mi.checked; saveSettings(); } },
     { label: 'Launch at login', type: 'checkbox', checked: settings.launchAtLogin, click: (mi) => { settings.launchAtLogin = mi.checked; saveSettings(); applyLoginItem(); } },
@@ -438,7 +464,8 @@ ipcMain.handle('settings:get', () => {
   return {
     mode: settings.mode, serverUrl: settings.serverUrl, launchAtLogin: settings.launchAtLogin, notifications: settings.notifications,
     hostConfigured: !!cfg,
-    host: cfg ? { port: cfg.port, ttlHours: cfg.ttlHours, maxMB: cfg.maxMB } : { port: 8443, ttlHours: 24, maxMB: 512 },
+    host: cfg ? { port: cfg.port, ttlHours: cfg.ttlHours, maxMB: cfg.maxMB, maxTotalMB: cfg.maxTotalMB || 0 } : { port: 8443, ttlHours: 24, maxMB: 512, maxTotalMB: 10240 },
+    hasPassphrase: !!settings.passEnc,
     hostUrls: drop ? drop.urls() : null, hostname: os.hostname().split('.')[0], canLoginItem: app.isPackaged,
     firstRun: !settings.mode,
     hostPaused: !!settings.hostPaused,
@@ -448,6 +475,7 @@ ipcMain.handle('settings:get', () => {
     pinnedHost: settings.mode === 'connect' ? settings.serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : null,
   };
 });
+ipcMain.handle('settings:reveal-passphrase', () => recallPassphrase());
 ipcMain.handle('settings:choose-dir', async () => {
   const r = await dialog.showOpenDialog(settingsWin || undefined, { properties: ['openDirectory', 'createDirectory'], defaultPath: settings.downloadDir || app.getPath('downloads'), message: 'Where should Chute save files?' });
   if (r.canceled || !r.filePaths[0]) return settings.downloadDir || app.getPath('downloads');
@@ -458,7 +486,7 @@ ipcMain.handle('settings:save', async (e, s) => {
   try {
     settings.notifications = !!s.notifications;
     settings.launchAtLogin = !!s.launchAtLogin;
-    if (s.passphrase) pendingPassphrase = String(s.passphrase);
+    if (s.passphrase) { pendingPassphrase = String(s.passphrase); rememberPassphrase(s.passphrase); }
     if (s.mode === 'connect') {
       const url = normalizeUrl(s.serverUrl);
       if (!url) throw new Error('Pick a chute from the list or enter its address.');
@@ -469,9 +497,9 @@ ipcMain.handle('settings:save', async (e, s) => {
       if (s.passphrase) {
         if (s.passphrase.length < 8) throw new Error('Use a passphrase of at least 8 characters.');
         if (existing) { try { fs.rmSync(path.join(HOST_DIR, 'data'), { recursive: true, force: true }); } catch { /* ignore */ } }
-        writeConfig({ dir: HOST_DIR, passphrase: s.passphrase, port: s.port, ttlHours: s.ttlHours, maxMB: s.maxMB });
+        writeConfig({ dir: HOST_DIR, passphrase: s.passphrase, port: s.port, ttlHours: s.ttlHours, maxMB: s.maxMB, maxTotalMB: s.maxTotalMB });
       } else if (existing) {
-        Object.assign(existing, { port: Number(s.port || existing.port), ttlHours: Number(s.ttlHours || existing.ttlHours), maxMB: Number(s.maxMB || existing.maxMB) });
+        Object.assign(existing, { port: Number(s.port || existing.port), ttlHours: Number(s.ttlHours || existing.ttlHours), maxMB: Number(s.maxMB || existing.maxMB), maxTotalMB: Number(s.maxTotalMB || 0) });
         fs.writeFileSync(path.join(HOST_DIR, 'config.json'), JSON.stringify(existing, null, 2) + '\n');
       } else throw new Error('Choose a passphrase to host the chute.');
       settings.mode = 'host'; settings.hostPaused = false;
@@ -480,8 +508,7 @@ ipcMain.handle('settings:save', async (e, s) => {
     saveSettings();
     applyLoginItem();
     refreshTray();
-    if (!win) createMainWindow();
-    win.loadURL(targetUrl()); // load now so the popover is ready (and unlocked) when opened
+    await navigatePopover(); // reload hidden so the popover is ready (and unlocked) when opened
     return { ok: true, hostUrls: drop ? drop.urls() : null };
   } catch (err) { return { ok: false, error: err.message }; }
 });
@@ -520,14 +547,14 @@ async function stopHostingDialog(parent) {
   if (response === 2) await emptyChute();
   await stopHost();
   settings.hostPaused = true; saveSettings();
-  if (win) win.loadURL(targetUrl());
+  await navigatePopover();
   refreshTray();
   return true;
 }
 async function resumeHosting() {
   try { await startHost(); settings.hostPaused = false; saveSettings(); }
   catch (e) { notify('Could not start hosting', e.message); return false; }
-  if (win) win.loadURL(targetUrl());
+  await navigatePopover();
   refreshTray();
   return true;
 }
@@ -535,13 +562,13 @@ async function resumeHosting() {
 async function deleteChute() {
   await stopHost();
   cleanDir(HOST_DIR);
-  settings.mode = null; settings.hostPaused = false; saveSettings();
+  settings.mode = null; settings.hostPaused = false; settings.passEnc = ''; saveSettings();
   await forgetPageState();
   if (win) { win.hide(); win.loadURL('about:blank'); }
   refreshTray();
 }
 async function leaveChute() {
-  settings.mode = null; settings.serverUrl = ''; saveSettings();
+  settings.mode = null; settings.serverUrl = ''; settings.passEnc = ''; saveSettings();
   await forgetPageState();
   if (win) { win.hide(); win.loadURL('about:blank'); }
   refreshTray();
@@ -648,6 +675,8 @@ async function runSelfTest() {
     settingsWin.close();
     await wait(400);
     results.modeAfterSetup = settings.mode;
+    results.passphraseRecalled = recallPassphrase() === 'test-passphrase-123';
+    results.maxTotalMB = hostConfig().maxTotalMB;
     openSettings();
     await new Promise((r) => settingsWin.webContents.once('did-finish-load', r));
     await wait(1200);
@@ -711,13 +740,11 @@ async function runSelfTest() {
     await wait(800);
     results.clipboardAfterClick = clipboard.readText().slice(0, 40);
     // pause / resume hosting
-    await stopHost(); settings.hostPaused = true; saveSettings(); win.loadURL(targetUrl());
-    await new Promise((r) => win.webContents.once('did-finish-load', r));
+    await stopHost(); settings.hostPaused = true; saveSettings(); await navigatePopover();
     await wait(500);
     fs.writeFileSync(path.join(out, 'paused.png'), (await win.webContents.capturePage()).toPNG());
     results.pausedPage = win.webContents.getURL().endsWith('paused.html');
     results.resumed = await resumeHosting();
-    await new Promise((r) => win.webContents.once('did-finish-load', r));
     await wait(4000);
     results.itemsAfterResume = await win.webContents.executeJavaScript('document.querySelectorAll(".item").length');
     results.ok = true;

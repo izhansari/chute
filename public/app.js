@@ -41,7 +41,7 @@
   const el = {
     insecure: $('#insecure'), gate: $('#gate'), gateForm: $('#gateForm'), pass: $('#passInput'), remember: $('#rememberBox'),
     unlockBtn: $('#unlockBtn'), gateError: $('#gateError'), gateIcon: $('#gateIcon'),
-    app: $('#app'), status: $('#status'), statusText: $('#statusText'), lockBtn: $('#lockBtn'), pinBtn: $('#pinBtn'), settingsBtn: $('#settingsBtn'), closeBtn: $('#closeBtn'), stopBtn: $('#stopBtn'),
+    app: $('#app'), status: $('#status'), statusText: $('#statusText'), lockBtn: $('#lockBtn'), pinBtn: $('#pinBtn'), settingsBtn: $('#settingsBtn'), stopBtn: $('#stopBtn'),
     toast: $('#toast'),
     dropzone: $('#dropzone'), dzIcon: $('#dzIcon'), chooseBtn: $('#chooseBtn'), fileInput: $('#fileInput'),
     textForm: $('#textForm'), textInput: $('#textInput'), sendBtn: $('#sendBtn'), uploads: $('#uploads'),
@@ -49,7 +49,7 @@
     overlay: $('#dropOverlay'), overlayIcon: $('#overlayIcon'),
   };
   setIcon(el.gateIcon, 'key'); setIcon(el.dzIcon, 'chute'); setIcon(el.sendBtn, 'send'); setIcon(el.emptyArt, 'inbox'); setIcon(el.overlayIcon, 'chute');
-  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear'); setIcon(el.closeBtn, 'close'); setIcon(el.stopBtn, 'power');
+  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear'); setIcon(el.stopBtn, 'power');
 
   const state = {
     token: null, key: null, server: null, clockOffset: 0,
@@ -63,6 +63,8 @@
     offline: false, failStreak: 0,
     staged: new Map(),      // id -> Promise<path | blobUrl> for drag-out
     textCache: new Map(),   // id -> full text
+    draggingOut: null,      // { id, name, at } while an item is being dragged out of the chute
+    usedBytes: 0, maxTotalBytes: 0,
   };
   let toastTimer = null;
   function toast(msg) {
@@ -185,7 +187,7 @@
     el.gate.hidden = true; el.app.hidden = false; el.lockBtn.hidden = !!desktop;
     el.status.classList.add('on');
     el.statusText.textContent = desktop ? (state.info && state.info.mode === 'host' ? 'Hosting' : 'Connected') : location.host;
-    if (desktop) { desktop.connState('online'); el.stopBtn.hidden = !(state.info && state.info.mode === 'host'); }
+    if (desktop) { desktop.connState('online'); const hosting = !!(state.info && state.info.mode === 'host'); el.stopBtn.hidden = !hosting; el.status.classList.toggle('clickable', hosting); el.status.title = hosting ? 'Click to pause hosting' : el.status.title; }
     el.status.title = `Items expire after ${state.server.ttlHours}h · max ${state.server.maxMB} MB each`;
   }
 
@@ -217,6 +219,7 @@
   async function applyList(data) {
     state.items = data.items;
     state.clockOffset = Date.now() - data.now;
+    state.usedBytes = data.usedBytes || 0; state.maxTotalBytes = data.maxTotalBytes || 0;
     const live = new Set(state.items.map((i) => i.id));
     for (const id of [...state.metaCache.keys()]) if (!live.has(id)) state.metaCache.delete(id);
     for (const id of [...state.fresh]) if (!live.has(id)) state.fresh.delete(id);
@@ -309,7 +312,10 @@
   function render() {
     el.items.replaceChildren();
     el.empty.hidden = state.items.length > 0;
-    el.listInfo.textContent = state.items.length ? `${state.items.length} item${state.items.length === 1 ? '' : 's'}` : '';
+    const count = state.items.length ? `${state.items.length} item${state.items.length === 1 ? '' : 's'}` : '';
+    const usage = state.maxTotalBytes ? `${fmtSize(state.usedBytes)} of ${fmtSize(state.maxTotalBytes)}` : (state.items.length ? fmtSize(state.usedBytes) : '');
+    el.listInfo.textContent = [count, usage].filter(Boolean).join(' · ');
+    el.listInfo.classList.toggle('full', !!state.maxTotalBytes && state.usedBytes > state.maxTotalBytes * 0.9);
     const now = Date.now() - state.clockOffset;
     for (const it of state.items) {
       const meta = state.metaCache.get(it.id) || { kind: 'file', name: '…' };
@@ -402,6 +408,8 @@
     state.staged.set(it.id, p);
   }
   function onDragStart(e, it, meta) {
+    state.draggingOut = { id: it.id, name: meta.name, at: Date.now() };
+    e.dataTransfer.setData('chute/internal', it.id); // lets our own drop handler ignore it
     if (meta.kind === 'text') {
       const t = state.textCache.get(it.id) || meta.preview || '';
       e.dataTransfer.setData('text/plain', t);
@@ -489,7 +497,7 @@
     try {
       const metaB64 = toB64(await encrypt(te.encode(JSON.stringify(meta))));
       const body = await encrypt(bytes);
-      const item = await uploadXHR(body, metaB64, row.progress);
+      const item = await uploadXHR(body, metaB64, row.progress).catch((err) => { if (/full/i.test(err.message)) toast('The chute is full'); throw err; });
       state.metaCache.set(item.id, meta);
       state.own.add(item.id);
       row.done();
@@ -551,14 +559,26 @@
 
   let dragDepth = 0;
   const setDragging = (on) => { document.body.classList.toggle('dragging', on); el.overlay.hidden = !on; };
-  const isExternalDrag = (e) => e.dataTransfer && [...e.dataTransfer.types].some((t) => t === 'Files' || t === 'text/plain') && !e.dataTransfer.types.includes('chute/internal');
-  document.addEventListener('dragenter', (e) => { e.preventDefault(); if (state.token && isExternalDrag(e)) { dragDepth++; setDragging(true); if (desktop) desktop.dragInWindow(true); } });
-  document.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = state.token ? 'copy' : 'none'; });
+  // A drag that started on one of our own items (DOM drag or the OS drag the desktop shell starts) must not be
+  // treated as something new to send. draggingOut expires on its own since a native drag never reports "ended".
+  const isOwnDrag = (e) => (e.dataTransfer && e.dataTransfer.types.includes('chute/internal')) || (state.draggingOut && Date.now() - state.draggingOut.at < 60000);
+  const isExternalDrag = (e) => e.dataTransfer && [...e.dataTransfer.types].some((t) => t === 'Files' || t === 'text/plain') && !isOwnDrag(e);
+  let overlayWatchdog = null;
+  const armWatchdog = () => { clearTimeout(overlayWatchdog); overlayWatchdog = setTimeout(() => { dragDepth = 0; setDragging(false); }, 450); }; // dragleave is unreliable; no dragover for a while = the drag left
+  document.addEventListener('dragenter', (e) => { e.preventDefault(); if (state.token && isExternalDrag(e)) { dragDepth++; setDragging(true); armWatchdog(); if (desktop) desktop.dragInWindow(true); } });
+  document.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = state.token && !isOwnDrag(e) ? 'copy' : 'none'; if (document.body.classList.contains('dragging')) armWatchdog(); });
   document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; setDragging(false); } });
+  document.addEventListener('dragend', () => { state.draggingOut = null; dragDepth = 0; setDragging(false); });
+  document.addEventListener('mouseup', () => { if (state.draggingOut) setTimeout(() => { state.draggingOut = null; }, 300); });
   document.addEventListener('drop', (e) => {
-    e.preventDefault(); dragDepth = 0; setDragging(false);
+    e.preventDefault(); dragDepth = 0; setDragging(false); clearTimeout(overlayWatchdog);
     if (!state.token) return;
-    if (e.dataTransfer.files && e.dataTransfer.files.length) return sendFiles(e.dataTransfer.files);
+    const own = state.draggingOut;
+    state.draggingOut = null;
+    if (e.dataTransfer.types.includes('chute/internal')) return;
+    const files = e.dataTransfer.files;
+    if (own && files && files.length === 1 && files[0].name === own.name) { toast("That's already in the chute"); return; }
+    if (files && files.length) return sendFiles(files);
     const text = e.dataTransfer.getData('text/plain');
     if (text) sendText(text);
   });
@@ -583,9 +603,9 @@
 
   if (desktop) {
     document.documentElement.classList.add('desktop', IS_MAC ? 'mac' : 'win');
-    el.settingsBtn.hidden = false; el.pinBtn.hidden = false; el.closeBtn.hidden = false;
-    el.closeBtn.addEventListener('click', () => desktop.hide());
+    el.settingsBtn.hidden = false; el.pinBtn.hidden = false;
     el.stopBtn.addEventListener('click', () => desktop.stopHosting());
+    el.status.addEventListener('click', () => { if (state.info && state.info.mode === 'host' && state.token) desktop.stopHosting(); });
     desktop.onLock(() => lock());
     desktop.onTrayDrag((on) => { if (state.token) setDragging(on); });
     const hint = document.getElementById('gateDesktopHint'); if (hint) hint.hidden = false;

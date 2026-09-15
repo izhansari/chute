@@ -17,6 +17,7 @@
       --danger: #ff5f57; --danger-soft: rgba(255,95,87,.12); --success: #30d158; --seg: rgba(255,255,255,.08); --shadow: none; }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { height: 100%; margin: 0; }
   body { font: 13px/1.45 var(--font); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; -webkit-user-select: none; display: flex; flex-direction: column; }
   input, textarea { -webkit-user-select: text; font-family: var(--font); }
@@ -213,8 +214,13 @@
             <label class="top" for="serverUrl">Or enter an address</label>
             <input class="field" type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false" autocomplete="off">
           </div>
-          <div class="field-row">
-            <label class="top" for="joinPass">Chute passphrase</label>
+          <div class="row" id="rowJoinCurrentPass" hidden>
+            <div class="grow"><div class="label addr" id="joinCurrentPass">••••••••••</div><div class="sub">The chute's passphrase, as saved on this device.</div></div>
+            <button class="icon-btn" type="button" id="revealJoinPass" title="Show passphrase"></button>
+            <button class="btn" type="button" id="changeJoinPassBtn">Change…</button>
+          </div>
+          <div class="field-row" id="rowJoinNewPass">
+            <label class="top" for="joinPass" id="joinPassLabel">Chute passphrase</label>
             <div class="with-btn">
               <input class="field" type="password" id="joinPass" placeholder="Ask whoever is hosting" autocomplete="off">
               <button class="icon-btn" type="button" data-toggle="joinPass" title="Show passphrase"></button>
@@ -242,12 +248,18 @@
       <div class="panel" id="panelHost">
         <div class="section-title">Passphrase</div>
         <div class="group">
-          <div class="field-row">
+          <div class="row" id="rowCurrentPass" hidden>
+            <div class="grow"><div class="label addr" id="currentPass">••••••••••</div><div class="sub">Teammates need this to join.</div></div>
+            <button class="icon-btn" type="button" id="revealPass" title="Show passphrase"></button>
+            <button class="btn" type="button" id="changePassBtn">Change…</button>
+          </div>
+          <div class="field-row" id="rowNewPass">
+            <label class="top" for="pass" id="passLabel" hidden>New passphrase</label>
             <div class="with-btn">
               <input class="field" type="password" id="pass" placeholder="At least 8 characters" autocomplete="new-password">
               <button class="icon-btn" type="button" data-toggle="pass" title="Show passphrase"></button>
             </div>
-            <div class="hint" id="passHint">Share it with teammates in person. It is never stored or sent anywhere.</div>
+            <div class="hint" id="passHint">Share it with teammates in person. It never leaves this computer.</div>
           </div>
         </div>
         <div class="section-title">Options</div>
@@ -264,6 +276,13 @@
             <select class="select" id="max">
               <option value="100">100 MB</option><option value="250">250 MB</option><option value="512" selected>512 MB</option>
               <option value="1024">1 GB</option><option value="2048">2 GB</option>
+            </select>
+          </div>
+          <div class="row">
+            <div class="grow"><div class="label">Maximum chute size</div><div class="sub">Everything in it, combined</div></div>
+            <select class="select" id="maxTotal">
+              <option value="1024">1 GB</option><option value="2048">2 GB</option><option value="5120">5 GB</option>
+              <option value="10240" selected>10 GB</option><option value="20480">20 GB</option><option value="0">No limit</option>
             </select>
           </div>
         </div>
@@ -295,10 +314,6 @@
         <label class="row"><div class="grow"><div class="label">Notify me when something arrives</div></div><input type="checkbox" class="switch" id="notifications" checked></label>
         <label class="row"><div class="grow"><div class="label">Launch at login</div><div class="sub" id="loginHint" hidden>Available in the installed app</div></div><input type="checkbox" class="switch" id="launchAtLogin"></label>
         <div class="row"><div class="grow"><div class="label">Save files to</div><div class="sub addr" id="downloadDir"></div></div><button class="btn" type="button" id="chooseDir">Choose…</button></div>
-      </div>
-      <div class="section-title">This device</div>
-      <div class="group">
-        <div class="row"><div class="grow"><div class="label">Lock this device</div><div class="sub">Forgets the passphrase here until you type it again. The chute keeps running.</div></div><button class="btn" type="button" id="lockBtn">Lock</button></div>
       </div>
       <div id="dangerHost" hidden>
         <div class="section-title">This chute</div>
