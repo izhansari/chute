@@ -1,6 +1,6 @@
 {
   "name": "chute",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Chute: toss files and text to people on your network. End-to-end encrypted, gone in a day.",
   "private": true,
   "main": "desktop/main.js",
@@ -44,7 +44,11 @@
       "category": "public.app-category.utilities",
       "icon": "desktop/icons/icon.png",
       "target": [{ "target": "dmg", "arch": ["universal"] }],
-      "extendInfo": { "LSUIElement": true },
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSLocalNetworkUsageDescription": "Chute finds chutes hosted on your local network and sends files to them.",
+        "NSBonjourServices": ["_chute._tcp"]
+      },
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",

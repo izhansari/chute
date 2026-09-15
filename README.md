@@ -6,8 +6,8 @@ it pops out on everyone else's. End-to-end encrypted, gone in a day.
 ## Download
 
 - **Mac** (Intel and Apple Silicon, signed and notarized):
-  [Chute-1.0.2-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.2/Chute-1.0.2-mac-universal.dmg)
-- **Windows**: [Chute-1.0.2-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.2/Chute-1.0.2-win-x64.exe)
+  [Chute-1.0.3-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.3/Chute-1.0.3-mac-universal.dmg)
+- **Windows**: [Chute-1.0.3-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.3/Chute-1.0.3-win-x64.exe)
   (unsigned: SmartScreen shows "More info → Run anyway" once)
 
 All releases: https://github.com/izhansari/chute/releases
@@ -106,6 +106,10 @@ things in from Finder or Explorer. Everything else is the same web UI described 
   passphrase, back to a fresh start.
 - **Leave this chute** (joiner, tray menu or Settings) forgets the address and passphrase
   on this device. Nothing is deleted for anyone else.
+- **Can't connect?** Settings → Connection → **Test** tells you exactly why: not reachable
+  (different network), nothing listening (host paused), certificate changed (host made a new
+  chute), or refused. On a Mac, if the test times out even though you're on the same Wi-Fi,
+  check System Settings → Privacy & Security → **Local Network** and allow Chute.
 - Settings shows the connection: who's hosting and their address, online/offline, the
   host's expiry and size limits, and for hosts, how many devices are connected.
 - Settings can **show the passphrase** (eye button) and **change it**. Changing it clears

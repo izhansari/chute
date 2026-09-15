@@ -76,9 +76,9 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 @keyframes blink { 50% { opacity: .35; } }
 html.offline .items { opacity: .55; }
 html.offline .dropzone, html.offline .composer { opacity: .5; pointer-events: none; }
-.item.copyable { cursor: copy; }
-.item.draggable { cursor: grab; }
-.item.draggable:active { cursor: grabbing; }
+.item { cursor: grab; }
+.item:active { cursor: grabbing; }
+.item .item-actions, .item .item-preview.full { cursor: default; }
 .toast { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 8px); background: var(--text); color: var(--bg); padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 500; opacity: 0; transition: opacity .18s, transform .18s; z-index: 60; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
 html.desktop .toast { color: #fff; background: rgba(30,30,34,.92); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }

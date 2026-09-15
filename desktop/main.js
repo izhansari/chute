@@ -461,6 +461,45 @@ ipcMain.handle('quick-look', (e, f) => quickLook(f && f.name, f && f.bytes));
 ipcMain.handle('app-info', () => ({ platform: process.platform, version: app.getVersion(), mode: settings.mode, pinned: settings.pinned, hostPaused: !!settings.hostPaused }));
 ipcMain.handle('take-passphrase', () => { const p = pendingPassphrase; pendingPassphrase = null; return p; });
 
+// ---------- connection probe (joiners): says exactly why a chute can't be reached ----------
+function probeChute(url) {
+  return new Promise((resolve) => {
+    let u; try { u = new URL(url); } catch { return resolve({ ok: false, reason: 'That address is not valid.' }); }
+    const https = require('https');
+    const done = (r) => { clearTimeout(timer); resolve(r); };
+    const timer = setTimeout(() => {
+      req.destroy();
+      const macHint = IS_MAC ? ' On a Mac, also check System Settings → Privacy & Security → Local Network and make sure Chute is allowed.' : '';
+      done({ ok: false, reason: `No answer from ${u.host} after 5 seconds. Most often this means you're not on the same network as the host, or the network keeps Wi-Fi and wired devices apart.${macHint}`, code: 'ETIMEDOUT' });
+    }, 5000);
+    const req = https.request({ host: u.hostname, port: u.port || 443, path: '/api/salt', method: 'GET', rejectUnauthorized: false, timeout: 5000 }, (res) => {
+      let body = '';
+      res.on('data', (d) => { body += d; });
+      res.on('end', () => {
+        const cert = res.socket.getPeerCertificate();
+        const fpHex = (cert && cert.fingerprint256) || '';
+        const fpB64 = fpHex ? 'sha256/' + Buffer.from(fpHex.replace(/:/g, ''), 'hex').toString('base64') : '';
+        const pinned = settings.pins[u.host];
+        const certState = !pinned ? 'new' : (pinned === fpB64 || pinned === fpHex ? 'same' : 'changed');
+        if (res.statusCode === 403) return done({ ok: false, reason: `${u.host} answered but refused: it only accepts private network addresses and yours (${req.socket && req.socket.localAddress}) is not one. Are you on a VPN or a guest network?` });
+        if (res.statusCode !== 200) return done({ ok: false, reason: `${u.host} answered with HTTP ${res.statusCode}. Is that really a Chute host?` });
+        let info = {}; try { info = JSON.parse(body); } catch { return done({ ok: false, reason: `${u.host} answered, but not like a Chute host.` }); }
+        done({ ok: true, host: u.host, ttlHours: info.ttlHours, maxMB: info.maxMB, certState });
+      });
+    });
+    req.on('error', (e) => {
+      const code = e.code || '';
+      const why = code === 'ECONNREFUSED' ? `${u.host} is reachable but nothing is listening on that port. The host may have paused or quit Chute, or the port is different.`
+        : code === 'ENOTFOUND' ? `${u.hostname} could not be looked up. Try the host's IP address instead of the .local name.`
+        : code === 'EHOSTUNREACH' || code === 'ENETUNREACH' ? `${u.host} is not reachable from this network.`
+        : `${e.message}`;
+      done({ ok: false, reason: why, code });
+    });
+    req.end();
+  });
+}
+ipcMain.handle('settings:probe', (e, url) => probeChute(normalizeUrl(url || settings.serverUrl)));
+
 // ---------- IPC (settings window) ----------
 ipcMain.handle('settings:get', () => {
   const cfg = hostConfig();
@@ -473,6 +512,7 @@ ipcMain.handle('settings:get', () => {
     firstRun: !settings.mode,
     hostPaused: !!settings.hostPaused,
     connectedDevices: drop ? drop.stats().connectedDevices : 0,
+    connectedIps: drop ? drop.stats().ips : [],
     connState, serverInfo,
     downloadDir: settings.downloadDir || app.getPath('downloads'),
     pinnedHost: settings.mode === 'connect' ? settings.serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : null,
@@ -679,6 +719,8 @@ async function runSelfTest() {
     await wait(400);
     results.modeAfterSetup = settings.mode;
     results.passphraseRecalled = recallPassphrase() === 'test-passphrase-123';
+    results.probeOwnHost = await probeChute(drop.urls().lan[1]);
+    results.probeNothingThere = await probeChute('https://127.0.0.1:8599/');
     results.maxTotalMB = hostConfig().maxTotalMB;
     openSettings();
     const consoleLines = [];

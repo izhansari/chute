@@ -206,6 +206,7 @@
         <div class="group" id="connGroup">
           <div class="row"><div class="pc" data-icon="pc" style="width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center"></div><div class="grow"><div class="label" id="connHost"></div><div class="sub addr" id="connAddr"></div></div><span class="state" id="connState"></span></div>
           <div class="row"><div class="grow"><div class="label">Host's settings</div><div class="sub" id="connLimits">Items expire after … · max … per item</div></div></div>
+          <div class="row"><div class="grow"><div class="label">Test connection</div><div class="sub" id="probeResult">Checks whether the host can be reached from here, and why not if it can't.</div></div><button class="btn" type="button" id="probeBtn">Test</button></div>
         </div>
       </div>
       <details class="adv quiet" id="switchChute" open><summary>Join a different chute</summary>
@@ -216,6 +217,7 @@
           <div class="field-row">
             <label class="top" for="serverUrl">Or enter an address</label>
             <input class="field" type="text" id="serverUrl" placeholder="https://their-computer.local:8443" spellcheck="false" autocomplete="off">
+            <div class="hint" id="addrHint"></div>
           </div>
         </div>
       </div>

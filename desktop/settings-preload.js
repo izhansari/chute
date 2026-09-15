@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('settingsApi', {
   lockDevice: () => ipcRenderer.invoke('settings:lock-device'),
   chooseDir: () => ipcRenderer.invoke('settings:choose-dir'),
   revealPassphrase: () => ipcRenderer.invoke('settings:reveal-passphrase'),
+  probe: (url) => ipcRenderer.invoke('settings:probe', url || ''),
   openExternal: (url) => ipcRenderer.send('settings:open-external', url),
   copy: (text) => ipcRenderer.invoke('settings:copy', String(text)),
   resize: (h) => ipcRenderer.send('settings:resize', Number(h)),

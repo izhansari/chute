@@ -199,7 +199,7 @@
       $('#hostStateRow').hidden = false;
       const st = $('#hostState');
       if (s.hostPaused) { $('#hostStateLabel').textContent = 'Hosting is paused'; $('#hostStateSub').textContent = 'The chute is off the network.'; st.textContent = 'Paused'; st.className = 'state pause'; }
-      else { $('#hostStateLabel').textContent = 'Hosting'; $('#hostStateSub').textContent = `${s.connectedDevices} device${s.connectedDevices === 1 ? '' : 's'} connected right now`; st.textContent = 'Live'; st.className = 'state ok'; }
+      else { $('#hostStateLabel').textContent = 'Hosting'; $('#hostStateSub').textContent = `${s.connectedDevices} device${s.connectedDevices === 1 ? '' : 's'} connected right now` + (s.connectedIps && s.connectedIps.length ? ' · ' + s.connectedIps.join(', ') : ''); st.textContent = 'Live'; st.className = 'state ok'; }
     }
     if (!firstRun) {
       document.documentElement.classList.add('compact');
@@ -243,6 +243,22 @@
   $('#emptyBtn').addEventListener('click', async () => { if (await api.hostAction('empty')) $('#error').textContent = ''; });
   $('#deleteBtn').addEventListener('click', async () => { if (await api.hostAction('delete')) location.reload(); });
   $('#chooseDir').addEventListener('click', async () => { $('#downloadDir').textContent = await api.chooseDir(); fit(); });
+  const describeProbe = (r) => r.ok
+    ? `Reachable. ${r.host} is a Chute host` + (r.certState === 'changed' ? ', but its certificate changed since you joined (the host made a new chute). Save to trust it.' : r.certState === 'new' ? '.' : ' and its certificate matches.') + ` Items expire after ${r.ttlHours} h, max ${r.maxMB} MB.`
+    : r.reason;
+  $('#probeBtn').addEventListener('click', async () => {
+    const out = $('#probeResult'); out.textContent = 'Testing…'; out.style.color = '';
+    const r = await api.probe($('#serverUrl').value);
+    out.textContent = describeProbe(r); out.style.color = r.ok ? 'var(--success)' : 'var(--danger)'; fit();
+  });
+  // while typing an address (join step), probe it once it looks complete
+  let probeTimer = null;
+  $('#serverUrl').addEventListener('input', () => {
+    clearTimeout(probeTimer);
+    const v = $('#serverUrl').value.trim(); const hint = $('#addrHint');
+    if (!v) { hint.textContent = ''; return; }
+    probeTimer = setTimeout(async () => { hint.textContent = 'Checking…'; hint.style.color = ''; const r = await api.probe(v); hint.textContent = describeProbe(r); hint.style.color = r.ok ? 'var(--success)' : 'var(--danger)'; fit(); }, 700);
+  });
   $('#leaveBtn').addEventListener('click', async () => { if (await api.hostAction('leave')) location.reload(); });
 
   load();
