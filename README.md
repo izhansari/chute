@@ -3,6 +3,15 @@
 Toss files and text to people on the same network. Drop something in on one machine,
 it pops out on everyone else's. End-to-end encrypted, gone in a day.
 
+## Download
+
+- **Mac** (Intel and Apple Silicon, signed and notarized):
+  [Chute-1.0.0-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.0/Chute-1.0.0-mac-universal.dmg)
+- **Windows**: [Chute-1.0.0-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.0/Chute-1.0.0-win-x64.exe)
+  (unsigned: SmartScreen shows "More info → Run anyway" once)
+
+All releases: https://github.com/izhansari/chute/releases
+
 - **Nothing to install on the other devices.** One machine runs the server; everyone
   else just opens a URL in a browser (Mac, Windows, Linux, phone).
 - **End-to-end encrypted.** Text and files are encrypted in the browser with AES-256-GCM
