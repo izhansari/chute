@@ -30,6 +30,7 @@
     inbox: '<path d="M4 13l2.5-8h11L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z"/><path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
     power: '<path d="M12 3v9M18.4 6.6a9 9 0 1 1-12.8 0"/>',
+    back: '<path d="M15 5l-7 7 7 7"/>',
   };
   function svg(name, cls = '') {
     const t = document.createElement('template');
@@ -42,14 +43,14 @@
     insecure: $('#insecure'), gate: $('#gate'), gateForm: $('#gateForm'), pass: $('#passInput'), remember: $('#rememberBox'),
     unlockBtn: $('#unlockBtn'), gateError: $('#gateError'), gateIcon: $('#gateIcon'),
     app: $('#app'), status: $('#status'), statusText: $('#statusText'), lockBtn: $('#lockBtn'), pinBtn: $('#pinBtn'), settingsBtn: $('#settingsBtn'), stopBtn: $('#stopBtn'),
-    toast: $('#toast'),
+    toast: $('#toast'), clearAllBtn: $('#clearAllBtn'), settingsView: $('#settingsView'), settingsBack: $('#settingsBack'), headerTitle: $('#headerTitle'),
     dropzone: $('#dropzone'), dzIcon: $('#dzIcon'), chooseBtn: $('#chooseBtn'), fileInput: $('#fileInput'),
     textForm: $('#textForm'), textInput: $('#textInput'), sendBtn: $('#sendBtn'), uploads: $('#uploads'),
     items: $('#items'), empty: $('#empty'), emptyArt: $('#emptyArt'), listInfo: $('#listInfo'),
     overlay: $('#dropOverlay'), overlayIcon: $('#overlayIcon'),
   };
   setIcon(el.gateIcon, 'key'); setIcon(el.dzIcon, 'chute'); setIcon(el.sendBtn, 'send'); setIcon(el.emptyArt, 'inbox'); setIcon(el.overlayIcon, 'chute');
-  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear'); setIcon(el.stopBtn, 'power');
+  setIcon(el.lockBtn, 'lock'); setIcon(el.pinBtn, 'pin'); setIcon(el.settingsBtn, 'gear'); setIcon(el.stopBtn, 'power'); setIcon(el.clearAllBtn, 'trash'); setIcon(el.settingsBack, 'back');
 
   const state = {
     token: null, key: null, server: null, clockOffset: 0,
@@ -177,7 +178,7 @@
     for (const u of state.imageUrls.values()) URL.revokeObjectURL(u);
     state.imageUrls.clear();
     try { sessionStorage.removeItem('chutePass'); localStorage.removeItem('chutePass'); } catch { /* ignore */ }
-    el.app.hidden = true; el.lockBtn.hidden = true; el.gate.hidden = false;
+    el.app.hidden = true; el.lockBtn.hidden = true; el.gate.hidden = !!(el.settingsView && !el.settingsView.hidden);
     el.status.classList.remove('on'); el.statusText.textContent = 'Locked';
     el.pass.value = '';
     if (msg) { el.gateError.textContent = msg; el.gateError.hidden = false; }
@@ -187,7 +188,7 @@
     el.gate.hidden = true; el.app.hidden = false; el.lockBtn.hidden = !!desktop;
     el.status.classList.add('on');
     el.statusText.textContent = desktop ? (state.info && state.info.mode === 'host' ? 'Hosting' : 'Connected') : location.host;
-    if (desktop) { desktop.connState('online'); const hosting = !!(state.info && state.info.mode === 'host'); el.stopBtn.hidden = !hosting; el.status.classList.toggle('clickable', hosting); el.status.title = hosting ? 'Click to pause hosting' : el.status.title; }
+    if (desktop) { desktop.connState('online'); el.stopBtn.hidden = !(state.info && state.info.mode); el.stopBtn.title = state.info && state.info.mode === 'host' ? 'Close chute…' : 'Leave chute…'; }
     el.status.title = `Items expire after ${state.server.ttlHours}h · max ${state.server.maxMB} MB each`;
   }
 
@@ -316,6 +317,7 @@
     const count = state.items.length ? `${state.items.length} item${state.items.length === 1 ? '' : 's'}` : '';
     const usage = state.maxTotalBytes ? `${fmtSize(state.usedBytes)} of ${fmtSize(state.maxTotalBytes)}` : (state.items.length ? fmtSize(state.usedBytes) : '');
     el.listInfo.textContent = [count, usage].filter(Boolean).join(' · ');
+    el.clearAllBtn.hidden = state.items.length === 0;
     el.listInfo.classList.toggle('full', !!state.maxTotalBytes && state.usedBytes > state.maxTotalBytes * 0.9);
     const now = Date.now() - state.clockOffset;
     for (const it of state.items) {
@@ -480,6 +482,92 @@
     render();
   }
 
+  async function clearAll() {
+    if (!state.items.length) return;
+    if (!confirm(`Delete everything in the chute (${state.items.length} item${state.items.length === 1 ? '' : 's'})? This is for everyone.`)) return;
+    await Promise.all(state.items.map((it) => api('/api/items/' + it.id, { method: 'DELETE' }).catch(() => {})));
+    state.items = []; state.fresh.clear(); render(); toast('Chute emptied');
+    refresh();
+  }
+  el.clearAllBtn.addEventListener('click', clearAll);
+
+  // ---------- in-popover settings (desktop app) ----------
+  const sv = {};
+  function initSettingsView() {
+    for (const id of ['sHostRow', 'sHostLabel', 'sHostSub', 'sHostState', 'sJoinRow', 'sJoinLabel', 'sJoinAddr', 'sJoinState', 'sLimitsRow', 'sLimits', 'sProbeRow', 'sProbeResult', 'sProbeBtn',
+      'sPass', 'sRevealPass', 'sChangePass', 'sNewPassRow', 'sNewPass', 'sNewPassHint', 'sNewPassSave', 'sAddrRow', 'sAddr', 'sCopyAddr', 'sOptionsTitle', 'sOptions', 'sTtl', 'sMax', 'sMaxTotal', 'sPort',
+      'sNotify', 'sLogin', 'sLoginHint', 'sDownloadDir', 'sChooseDir', 'sTheme', 'sCloseLabel', 'sCloseSub', 'sCloseBtn', 'versionLabel', 'sQuit']) sv[id] = $('#' + id);
+    setIcon(sv.sRevealPass, 'eye'); setIcon(sv.sCopyAddr, 'copy');
+    const S = desktop.settings;
+    const fmtTtl = (h) => (!h ? '…' : h % 24 === 0 ? (h / 24) + ' day' + (h === 24 ? '' : 's') : h + ' hours');
+    const fmtMB = (mb) => (!mb ? 'no limit' : mb >= 1024 ? (mb / 1024) + ' GB' : mb + ' MB');
+    const pick = (sel, value, label) => { if (![...sel.options].some((o) => Number(o.value) === Number(value))) sel.add(new Option(label, String(value))); sel.value = String(value); };
+    let revealed = false;
+
+    sv.apply = (d) => {
+      const hosting = d.mode === 'host';
+      sv.sHostRow.hidden = !hosting; sv.sJoinRow.hidden = hosting; sv.sLimitsRow.hidden = hosting; sv.sProbeRow.hidden = hosting;
+      sv.sOptionsTitle.hidden = !hosting; sv.sOptions.hidden = !hosting; sv.sAddrRow.hidden = !hosting;
+      if (hosting) {
+        sv.sHostSub.textContent = `${d.connectedDevices} device${d.connectedDevices === 1 ? '' : 's'} connected` + (d.connectedIps && d.connectedIps.length ? ' · ' + d.connectedIps.join(', ') : '');
+        if (d.host) { pick(sv.sTtl, d.host.ttlHours, d.host.ttlHours + ' hours'); pick(sv.sMax, d.host.maxMB, d.host.maxMB + ' MB'); pick(sv.sMaxTotal, d.host.maxTotalMB || 0, Math.round((d.host.maxTotalMB || 0) / 1024) + ' GB'); sv.sPort.value = d.host.port; }
+        if (d.hostUrls) { sv.sAddr.textContent = d.hostUrls.lan[0]; sv.sCopyAddr.onclick = async () => { await navigator.clipboard.writeText(d.hostUrls.lan.join('\n')).catch(() => {}); toast('Address copied'); }; }
+        sv.sCloseLabel.textContent = 'Close chute'; sv.sCloseSub.textContent = 'Stops hosting, deletes everything, forgets the passphrase.'; sv.sCloseBtn.textContent = 'Close…';
+        sv.sNewPassHint.textContent = 'Changing it clears everything in the chute. Teammates need the new one.';
+      } else {
+        sv.sJoinLabel.textContent = (d.pinnedHost || '').split(':')[0]; sv.sJoinAddr.textContent = d.pinnedHost || '';
+        const off = state.offline, locked = !state.token;
+        sv.sJoinState.textContent = off ? 'Host offline' : locked ? 'Locked' : 'Connected'; sv.sJoinState.className = 'state ' + (off ? 'bad' : locked ? '' : 'ok');
+        sv.sLimits.textContent = state.server ? `Items expire after ${fmtTtl(state.server.ttlHours)} · up to ${fmtMB(state.server.maxMB)} per item` : 'Unlock the chute to see them';
+        sv.sCloseLabel.textContent = 'Leave chute'; sv.sCloseSub.textContent = 'Forgets the address and passphrase on this device. Nothing is deleted for others.'; sv.sCloseBtn.textContent = 'Leave…';
+        sv.sNewPassHint.textContent = 'Use this if the host changed the passphrase.';
+      }
+      sv.sNotify.checked = !!d.notifications; sv.sLogin.checked = !!d.launchAtLogin;
+      if (!d.canLoginItem) { sv.sLogin.disabled = true; sv.sLoginHint.hidden = false; }
+      sv.sDownloadDir.textContent = d.downloadDir || '';
+      for (const b of sv.sTheme.querySelectorAll('button')) b.classList.toggle('on', b.dataset.theme === (d.theme || 'system'));
+      sv.versionLabel.textContent = 'Chute ' + d.version;
+    };
+    const save = async (patch) => { const d = await S.update(patch); sv.apply(d); toast('Saved'); };
+    sv.sNotify.addEventListener('change', () => save({ notifications: sv.sNotify.checked }));
+    sv.sLogin.addEventListener('change', () => save({ launchAtLogin: sv.sLogin.checked }));
+    sv.sTtl.addEventListener('change', () => save({ ttlHours: Number(sv.sTtl.value) }));
+    sv.sMax.addEventListener('change', () => save({ maxMB: Number(sv.sMax.value) }));
+    sv.sMaxTotal.addEventListener('change', () => save({ maxTotalMB: Number(sv.sMaxTotal.value) }));
+    sv.sPort.addEventListener('change', () => { const p = Number(sv.sPort.value); if (p >= 1024 && p <= 65535) save({ port: p }); });
+    sv.sTheme.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) save({ theme: b.dataset.theme }); });
+    sv.sChooseDir.addEventListener('click', async () => { sv.sDownloadDir.textContent = await S.chooseDir(); toast('Saved'); });
+    sv.sRevealPass.addEventListener('click', async () => { revealed = !revealed; sv.sPass.textContent = revealed ? ((await S.revealPassphrase()) || '(not saved on this device)') : '••••••••••'; setIcon(sv.sRevealPass, revealed ? 'eyeOff' : 'eye'); });
+    sv.sChangePass.addEventListener('click', () => { sv.sNewPassRow.hidden = false; sv.sNewPass.focus(); });
+    sv.sNewPassSave.addEventListener('click', async () => {
+      const p = sv.sNewPass.value;
+      const r = await S.changePassphrase(p);
+      if (!r.ok) { toast(r.error); return; }
+      sv.sNewPassRow.hidden = true; sv.sNewPass.value = ''; revealed = false; sv.sPass.textContent = '••••••••••'; setIcon(sv.sRevealPass, 'eye');
+      toast('Passphrase changed');
+      state.server = null; lock(); await unlock(p, true); showSettings(false);
+    });
+    sv.sNewPass.addEventListener('keydown', (e) => { if (e.key === 'Enter') sv.sNewPassSave.click(); });
+    sv.sProbeBtn.addEventListener('click', async () => {
+      sv.sProbeResult.textContent = 'Testing…'; sv.sProbeResult.style.color = '';
+      const r = await S.probe();
+      sv.sProbeResult.textContent = r.ok ? `Reachable. ${r.host} is a Chute host${r.certState === 'changed' ? ', but its certificate changed (the host made a new chute)' : ''}.` : r.reason;
+      sv.sProbeResult.style.color = r.ok ? 'var(--success)' : 'var(--danger)';
+    });
+    sv.sCloseBtn.addEventListener('click', () => desktop.closeChute());
+    sv.sQuit.addEventListener('click', () => desktop.quit());
+  }
+  async function showSettings(on) {
+    if (!desktop) return;
+    if (on) { sv.apply(await desktop.settings.get()); }
+    el.settingsView.hidden = !on;
+    el.app.hidden = on || !state.token;
+    el.gate.hidden = on || !!state.token;
+    el.settingsBack.hidden = !on; el.settingsBtn.hidden = on; el.pinBtn.hidden = on; el.stopBtn.hidden = on || !(state.info && state.info.mode);
+    el.status.hidden = on; el.headerTitle.textContent = on ? 'Settings' : 'Chute';
+    document.querySelector('.shell').scrollTop = 0;
+  }
+
   // ---------- sending ----------
   function uploadRow(label) {
     const bar = h('div'); const barWrap = h('div', { class: 'bar' }, bar);
@@ -605,14 +693,17 @@
   if (desktop) {
     document.documentElement.classList.add('desktop', IS_MAC ? 'mac' : 'win'); // normally already set by the server
     el.settingsBtn.hidden = false; el.pinBtn.hidden = false;
-    el.stopBtn.addEventListener('click', () => desktop.stopHosting());
-    el.status.addEventListener('click', () => { if (state.info && state.info.mode === 'host' && state.token) desktop.stopHosting(); });
+    el.stopBtn.addEventListener('click', () => desktop.closeChute());
+    initSettingsView();
+    el.settingsBack.addEventListener('click', () => showSettings(false));
+    desktop.onShowSettings(() => showSettings(true));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.settingsView.hidden) { e.stopImmediatePropagation(); showSettings(false); } }, true);
     desktop.onLock(() => lock());
     desktop.onTrayDrag((on) => { if (state.token) setDragging(on); });
     const hint = document.getElementById('gateDesktopHint'); if (hint) hint.hidden = false;
-    el.settingsBtn.addEventListener('click', () => desktop.openSettings());
+    el.settingsBtn.addEventListener('click', () => showSettings(true));
     el.pinBtn.addEventListener('click', async () => { const pinned = await desktop.togglePinned(); el.pinBtn.classList.toggle('active', pinned); });
-    desktop.info().then((info) => { state.info = info; el.pinBtn.classList.toggle('active', !!info.pinned); el.stopBtn.hidden = info.mode !== 'host'; if (state.token) showApp(); });
+    desktop.info().then((info) => { state.info = info; el.pinBtn.classList.toggle('active', !!info.pinned); el.stopBtn.hidden = !info.mode; if (state.token) showApp(); });
     el.remember.checked = true;
     desktop.onDropFiles((files) => { if (state.token) sendFiles(files.map((f) => new File([f.bytes], f.name, { type: f.type || '' }))); });
     desktop.onDropText((text) => { if (state.token) sendText(text); });

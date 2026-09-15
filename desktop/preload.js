@@ -26,6 +26,15 @@ contextBridge.exposeInMainWorld('chute', {
   unstage: (ids) => ipcRenderer.send('unstage', ids),
   serverInfo: (info) => ipcRenderer.send('server-info', { ttlHours: info.ttlHours, maxMB: info.maxMB }),
   connState: (st) => ipcRenderer.send('conn-state', String(st)),
-  stopHosting: () => ipcRenderer.send('stop-hosting'),
-  resumeHosting: () => ipcRenderer.send('resume-hosting'),
+  closeChute: () => ipcRenderer.send('close-chute'),
+  quit: () => ipcRenderer.send('quit'),
+  onShowSettings: (cb) => { ipcRenderer.on('show-settings', () => cb()); },
+  settings: {
+    get: () => ipcRenderer.invoke('page-settings:get'),
+    update: (patch) => ipcRenderer.invoke('page-settings:update', patch),
+    chooseDir: () => ipcRenderer.invoke('page-settings:choose-dir'),
+    revealPassphrase: () => ipcRenderer.invoke('page-settings:reveal-passphrase'),
+    probe: () => ipcRenderer.invoke('page-settings:probe'),
+    changePassphrase: (p) => ipcRenderer.invoke('page-settings:change-passphrase', String(p || '')),
+  },
 });

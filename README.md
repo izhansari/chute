@@ -6,8 +6,8 @@ it pops out on everyone else's. End-to-end encrypted, gone in a day.
 ## Download
 
 - **Mac** (Intel and Apple Silicon, signed and notarized):
-  [Chute-1.0.4-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.4/Chute-1.0.4-mac-universal.dmg)
-- **Windows**: [Chute-1.0.4-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.4/Chute-1.0.4-win-x64.exe)
+  [Chute-1.0.5-mac-universal.dmg](https://github.com/izhansari/chute/releases/download/v1.0.5/Chute-1.0.5-mac-universal.dmg)
+- **Windows**: [Chute-1.0.5-win-x64.exe](https://github.com/izhansari/chute/releases/download/v1.0.5/Chute-1.0.5-win-x64.exe)
   (unsigned: SmartScreen shows "More info → Run anyway" once)
 
 All releases: https://github.com/izhansari/chute/releases
@@ -90,81 +90,32 @@ things in from Finder or Explorer. Everything else is the same web UI described 
 - The host's self-signed certificate is remembered on first connection (trust on first
   use). If it ever changes, you are asked before continuing.
 
-### Locking, leaving, and closing a chute
+### Closing a chute
 
 - **Close the window** by clicking the menu bar icon again, pressing Esc, or clicking
   anywhere else. Nothing happens to the chute; it's just out of the way.
 - **Quit Chute** closes the app. If you are the host, the chute is offline until you open
   Chute again; the items are still there when it comes back (until they expire).
-- **Pause hosting** (click the green "Hosting" pill or the power button in the window, or
-  use the tray menu or Settings) takes the chute off the network. One dialog asks whether to keep the items or delete everything.
-  The chute is paused, not gone: **Start hosting again** brings it back with the same
-  passphrase and, if you kept them, the same items.
-- **Empty the chute** (host, tray menu or Settings) deletes everything in it right now for
-  everyone, and keeps hosting.
-- **Delete this chute** (host, Settings) stops hosting, deletes everything, and forgets the
-  passphrase, back to a fresh start.
-- **Leave this chute** (joiner, tray menu or Settings) forgets the address and passphrase
-  on this device. Nothing is deleted for anyone else.
-- **Can't connect?** Settings → Connection → **Test** tells you exactly why: not reachable
-  (different network), nothing listening (host paused), certificate changed (host made a new
-  chute), or refused. On a Mac, if the test times out even though you're on the same Wi-Fi,
-  check System Settings → Privacy & Security → **Local Network** and allow Chute.
-- Settings shows the connection: who's hosting and their address, online/offline, the
-  host's expiry and size limits, and for hosts, how many devices are connected.
-- Settings can **show the passphrase** (eye button) and **change it**. Changing it clears
-  the chute, since items are encrypted with the old one. The passphrase is kept on the
-  device encrypted with the OS keychain so it can be shown later.
-- Hosts set a **maximum chute size** (1 GB to 20 GB, or no limit; default 10 GB). Uploads
-  that would exceed it are refused with "the chute is full", and the window shows
-  "used of total" next to the item count.
+- **Close chute** (the power button in the window, the tray menu, or Settings) is the one
+  permanent action for a host: it stops hosting, deletes everything, and forgets the
+  passphrase. Teammates see the chute as offline. Joiners get **Leave chute** instead, which
+  forgets the address and passphrase on that device and deletes nothing for anyone else.
+- The **trash icon** next to the item count deletes everything in the chute for everyone,
+  and keeps the chute running.
 
-### "Apple could not verify Chute is free of malware"
+### Settings
 
-`npm run dist` makes **unsigned** installers. On another person's Mac, Gatekeeper blocks
-the first open with that message (and on recent macOS the old right-click → Open trick
-no longer works). The DMG includes a text file with these steps:
+The gear opens Settings inside the popover. Every change saves immediately:
 
-1. Click **Done**, not Move to Trash.
-2. System Settings → **Privacy & Security** → scroll to the bottom.
-3. Next to *"Chute" was blocked to protect your Mac*, click **Open Anyway**, then **Open**.
-
-Once per machine. Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Chute.app`.
-Windows SmartScreen: "More info → Run anyway".
-
-### Signing and notarizing (removes the warning for everyone)
-
-You need the paid Apple Developer Program and a **Developer ID Application** certificate
-installed in your keychain (Xcode → Settings → Accounts → Manage Certificates → + →
-Developer ID Application). Then:
-
-Store notarization credentials in your keychain once. The team ID is the one in
-parentheses on the *Developer ID Application* line of `security find-identity -v -p codesigning`
-(not your personal development team). The password is an app-specific password from
-account.apple.com → Sign-In and Security; it is prompted for, never put on the command line.
-
-```bash
-xcrun notarytool store-credentials chute --apple-id "you@example.com" --team-id XXXXXXXXXX
-```
-
-Then build:
-
-```bash
-APPLE_KEYCHAIN_PROFILE=chute npm run dist:signed
-```
-
-The build is already configured for the hardened runtime, entitlements, and notarization;
-electron-builder signs with the Developer ID it finds and submits the app to Apple (a few
-minutes), then staples the ticket. The resulting DMG opens on any Mac without warnings.
-For Windows, a code-signing certificate can be supplied via `CSC_LINK` / `CSC_KEY_PASSWORD`.
-
-To confirm a build will pass Gatekeeper on other Macs, mount the DMG and run:
-
-```bash
-spctl -a -vv -t exec "/Volumes/Chute/Chute.app"
-```
-
-It should print `accepted` and `source=Notarized Developer ID`.
+- **Chute**: hosting status and connected devices (host) or the host's address, status and a
+  **Test connection** button (joiner); the passphrase, with show and change; the address
+  teammates use.
+- **Options** (host): keep items for, maximum item size, maximum chute size, port.
+- **Behaviour**: notifications, launch at login, where to save files, and **Appearance**
+  (Auto / Light / Dark). If the window ever looks like a flat light box with light text,
+  pick Light or Dark explicitly: that pins the page and the window's blur material to the
+  same appearance.
+- The version and a Quit button are at the bottom.
 
 ## Plain server: setup (once, on the machine that will host the chute)
 
